@@ -1,0 +1,12 @@
+node_modules/
+dist/
+*.log
+.env
+server/fixtures/*.json
+!server/fixtures/example-planted.json
+
+# Regenerable startup cache written after each successful economy poll.
+packages/shared/data/arbitrage-snapshot.json
+
+# Local Claude Code settings (personal, not shared)
+.claude/settings.local.json

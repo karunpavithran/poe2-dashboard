@@ -1,0 +1,25 @@
+{
+  "name": "@poe2-dashboard/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file=../.env --watch --import tsx/esm src/index.ts",
+    "start": "node --env-file=../.env --import tsx/esm src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.105.0",
+    "@poe2-dashboard/shared": "*",
+    "fastify": "^5.0.0",
+    "fetch-extras": "^3.2.0",
+    "pbf": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}
