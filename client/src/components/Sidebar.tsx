@@ -1,5 +1,5 @@
 import { ArrowLeftRight, Map, TrendingUp } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useRef } from 'react'
 import { Link, useLocation } from 'react-router'
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -27,23 +27,21 @@ const sectionOf = (pathname: string): string => pathname.split('/')[1] ?? ''
  * whole location string, any URL-encoded state is preserved uniformly with no
  * per-feature handling.
  *
- * The Sidebar never unmounts (it lives in the Layout), so this map persists for
- * the whole session in component state — no store needed. It's in-memory only,
- * so a full page reload starts each tab fresh; swap `lastVisited` for
- * sessionStorage if reload-survival is ever wanted.
+ * The browser doesn't expose past history entries to read back, so we keep the
+ * map ourselves in a ref used purely as a render cache: we record the current
+ * section's location as we render (no effect, no extra render), and the links
+ * below read it in the same pass, so each tab always points at its freshest
+ * remembered spot. The Sidebar never unmounts (it lives in the Layout), so the
+ * ref persists for the whole session — no store needed. It's in-memory only, so
+ * a full page reload starts each tab fresh; swap the ref for sessionStorage if
+ * reload-survival is ever wanted.
  */
 export const Sidebar = () => {
   const location = useLocation()
   const current = sectionOf(location.pathname)
-  const [lastVisited, setLastVisited] = useState<Record<string, string>>({})
 
-  // Record the full location for whichever section we're currently in.
-  useEffect(() => {
-    setLastVisited(prev => ({
-      ...prev,
-      [current]: location.pathname + location.search + location.hash,
-    }))
-  }, [current, location.pathname, location.search, location.hash])
+  const lastVisited = useRef<Record<string, string>>({})
+  lastVisited.current[current] = location.pathname + location.search + location.hash
 
   return (
     <aside className="flex w-14 flex-col shrink-0 h-screen border-r border-sidebar-border bg-sidebar">
@@ -55,7 +53,7 @@ export const Sidebar = () => {
           // Active is decided by section, not an exact path match, so the tab
           // still highlights on nested routes and remembered deep links.
           const active = current === section
-          const to = lastVisited[section] ?? path
+          const to = lastVisited.current[section] ?? path
           return (
             <Tooltip key={section}>
               <TooltipTrigger asChild>
