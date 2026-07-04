@@ -61,10 +61,30 @@ export const fetchArbitrages = async () => {
   return data
 }
 
-export const { useResource: useArbitragesQuery } = createResourceQuery({
-  name: 'arbitrages',
-  fetcher: fetchArbitrages,
-})
+export const { useResource: useArbitragesQuery, queryKey: arbitragesQueryKey } =
+  createResourceQuery({
+    name: 'arbitrages',
+    fetcher: fetchArbitrages,
+  })
+
+// Ask the server to kick a fresh economy poll. Reading GET /api/arbitrages only
+// ever returns the cached snapshot, so this is the sole way the client can pull
+// data newer than the last scheduled server poll. Returns 202 right away; the
+// poll runs for minutes, and the query's background refetch surfaces the result.
+export const requestArbitrageRefresh = async (): Promise<void> => {
+  const res = await fetch('/api/arbitrages/refresh', { method: 'POST' })
+  if (!res.ok) throw new Error(`Backend returned ${res.status}`)
+}
+
+export const useRefreshArbitrages = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: requestArbitrageRefresh,
+    // Refetch immediately so the badge flips to "refreshing…" (isRefreshing=true)
+    // without waiting for the next background poll to notice the poll started.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: arbitragesQueryKey }),
+  })
+}
 
 export const fetchAtlas = async (): Promise<AtlasStrategy[]> => {
   const res = await fetch('/api/atlas')

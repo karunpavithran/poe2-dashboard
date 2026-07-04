@@ -39,6 +39,12 @@ export const createServer = (
   state: PollerState,
   league: string,
   twitchState: TwitchPollerState,
+  /**
+   * Kicks a fresh economy poll for the on-demand refresh route. Fire-and-forget:
+   * the poll takes minutes, so the route returns immediately and clients observe
+   * completion via `isRefreshing`/`updatedAt` on subsequent GET /api/arbitrages.
+   */
+  refreshArbitrages: () => void,
 ) => {
   const app = Fastify({ logger: true, disableRequestLogging: true })
 
@@ -60,6 +66,7 @@ export const createServer = (
       league,
       updatedAt: snapshot?.fetchedAt ?? null,
       dataAgeMs: snapshot ? Date.now() - snapshot.fetchedAt : null,
+      isRefreshing: state.isPolling,
       arbitrages: applyFilters(state.arbitrages, {
         minProfitPct,
         minVolume,
@@ -69,6 +76,15 @@ export const createServer = (
       currencyValues: state.currencyValues,
       lastError: state.lastError,
     }
+  })
+
+  // On-demand refresh: kick a poll and return 202 immediately. The poller's
+  // skip-if-running guard coalesces concurrent clicks (and the scheduled poll)
+  // into a single in-flight poll, so spamming this is harmless. Clients watch
+  // `isRefreshing` on GET /api/arbitrages to know when it lands.
+  app.post('/api/arbitrages/refresh', (_req, reply) => {
+    refreshArbitrages()
+    reply.code(202).send({ isRefreshing: true })
   })
 
   app.get('/api/streams', () => toStreamsResponse(twitchState))

@@ -23,6 +23,12 @@ export type PollerState = {
   ascendancyTrends: AscendancyTrend[]
   mainSkills: MainSkillTrend[]
   lastError: string | null
+  /**
+   * True while pollOnce is running. Exposed on state (not just a closure flag)
+   * so route handlers can report an in-flight poll to clients — an on-demand
+   * refresh takes minutes, so the UI needs to reflect it for the whole window.
+   */
+  isPolling: boolean
 }
 
 export const createPoller = (options: PollerOptions) => {
@@ -34,6 +40,7 @@ export const createPoller = (options: PollerOptions) => {
     ascendancyTrends: [],
     mainSkills: [],
     lastError: null,
+    isPolling: false,
   }
 
   // Rehydrate the Arbitrage widget's data from the last run so the UI renders
@@ -76,15 +83,14 @@ export const createPoller = (options: PollerOptions) => {
   // several minutes — longer than the poll interval if it's set low. Without this
   // guard, the interval timer launches overlapping polls that all contend for the
   // shared rate limiter, so each poll runs slower than the last and the backlog
-  // grows without bound. Skip-if-running keeps exactly one poll in flight.
-  let polling = false
-
+  // grows without bound. Skip-if-running keeps exactly one poll in flight, and
+  // makes an on-demand refresh POST while a poll is already running a no-op.
   const pollOnce = async (): Promise<void> => {
-    if (polling) {
+    if (state.isPolling) {
       console.warn('[poller] poll already in progress; skipping this interval')
       return
     }
-    polling = true
+    state.isPolling = true
     const start = Date.now()
     console.log(`[poller] poll starting for league "${options.league}"`)
     try {
@@ -151,7 +157,7 @@ export const createPoller = (options: PollerOptions) => {
       // Released once the economy fetch + arbitrage compute finishes; the
       // best-effort build-data fetches above are fire-and-forget and don't hold
       // the next poll back.
-      polling = false
+      state.isPolling = false
     }
   }
 

@@ -177,6 +177,47 @@
         "travel",
         "city"
       ]
+    },
+    {
+      "id": "6a305293-f612-47e7-a198-a0dd1fff73b2",
+      "name": "Expedition",
+      "sourceUrl": "https://www.youtube.com/watch?v=3hF0Om74UJ0",
+      "profitPerHour": 75,
+      "master": {
+        "name": "Jado",
+        "nodes": "1-1, 2-2, 3-1, 4-2"
+      },
+      "tablets": [
+        {
+          "type": "Irradiated",
+          "quantity": 3,
+          "mods": [
+            "Waystone Drop %"
+          ]
+        },
+        {
+          "type": "Irradiated",
+          "quantity": 3,
+          "mods": [
+            "monster rarity",
+            "item rarity"
+          ]
+        },
+        {
+          "type": "Irradiated",
+          "quantity": 1,
+          "mods": [
+            "additional modifiers",
+            "monster rarity",
+            "item rarity"
+          ]
+        }
+      ],
+      "notes": "3 node types:\nTravel - 3x Irradiated tablet farm\nReg Expedition - T16 6mod rarity/monster rarity/effectiveness waystones\nAldur - same waystones, 2 additional modifier tablets, 1x prefix of monster/item rarity or effectiveness",
+      "tags": [
+        "expedition",
+        "travel"
+      ]
     }
   ]
 }

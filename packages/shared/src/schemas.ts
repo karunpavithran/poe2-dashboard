@@ -126,6 +126,13 @@ export const ArbitragesResponseSchema = ArbitragePayloadSchema.extend({
   updatedAt: z.number().nullable(),
   /** Age of that snapshot in ms at response time, null before first successful poll. */
   dataAgeMs: z.number().nullable(),
+  /**
+   * True while an economy poll is in flight (the scheduled hourly poll or an
+   * on-demand refresh via POST /api/arbitrages/refresh). Lets the client show a
+   * "refreshing…" state for the whole multi-minute poll rather than the brief
+   * flicker of the cheap cached-snapshot read.
+   */
+  isRefreshing: z.boolean(),
   /** Set if the most recent poll failed (last good snapshot is still served). */
   lastError: z.string().nullable(),
 })

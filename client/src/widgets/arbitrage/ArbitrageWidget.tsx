@@ -1,5 +1,6 @@
 import { Loader2, X } from 'lucide-react'
 
+import { useRefreshArbitrages } from '@/api.js'
 import { DataAge } from '@/components/common/DataAge.js'
 import { sectionLabelClass } from '@/components/common/SectionLabel.js'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -10,9 +11,10 @@ import { FilterToolbar } from './FilterToolbar.js'
 import { PayoffCalculator } from './PayoffCalculator.js'
 
 const ArbitrageCard = () => {
-  const { arbitrages, refetchArbitrages, isArbitragesFetching } = useArbitrages()
-  const { dataAgeMs, lastError } = arbitrages
+  const { arbitrages, isArbitragesFetching } = useArbitrages()
+  const { dataAgeMs, lastError, isRefreshing } = arbitrages
   const { selectedCycleKey, setSelectedCycleKey } = useArbitrageContext()
+  const refresh = useRefreshArbitrages()
 
   return (
     <Card className="h-full">
@@ -30,8 +32,8 @@ const ArbitrageCard = () => {
         ) : (
           <DataAge
             fetchedAt={Date.now() - dataAgeMs}
-            onRefetch={refetchArbitrages}
-            isFetching={isArbitragesFetching}
+            onRefetch={() => refresh.mutate()}
+            isFetching={isRefreshing || refresh.isPending || isArbitragesFetching}
           />
         )}
       </CardHeader>
