@@ -1,8 +1,8 @@
-import { Suspense, useState } from 'react'
+import { Suspense } from 'react'
 import type { FallbackProps } from 'react-error-boundary'
 import { ErrorBoundary } from 'react-error-boundary'
+import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router'
 
-import type { View } from './components/Sidebar.js'
 import { Sidebar } from './components/Sidebar.js'
 import { Card, CardContent } from './components/ui/card.js'
 import { ArbitrageWidget } from './widgets/arbitrage/ArbitrageWidget.js'
@@ -28,22 +28,23 @@ const WidgetError = ({ error }: FallbackProps) => (
   </Card>
 )
 
-export const App = () => {
-  const [view, setView] = useState<View>('arbitrage')
+// ArbitrageProvider lives above the Outlet so the arbitrage UI state it still
+// owns — table sorting and the selected payoff cycle — survives navigating away
+// from the widget and back. (The filters themselves now live in the URL query.)
+const Layout = () => {
+  const location = useLocation()
 
   return (
-    // ArbitrageProvider lives above the view switch so its filter state survives
-    // navigating away from the arbitrage widget and back.
     <ArbitrageProvider>
       <div className="flex h-screen overflow-hidden">
-        <Sidebar active={view} onSelect={setView} />
+        <Sidebar />
         <main className="flex-1 overflow-hidden p-6 flex flex-col">
           <div className="flex-1 min-h-0">
-            <ErrorBoundary FallbackComponent={WidgetError}>
+            {/* Keying by pathname resets the boundary so an error on one route
+                doesn't linger after navigating to another. */}
+            <ErrorBoundary key={location.pathname} FallbackComponent={WidgetError}>
               <Suspense fallback={<WidgetSkeleton />}>
-                {view === 'arbitrage' && <ArbitrageWidget />}
-                {view === 'trends' && <TrendsWidget />}
-                {view === 'atlas' && <AtlasWidget />}
+                <Outlet />
               </Suspense>
             </ErrorBoundary>
           </div>
@@ -52,3 +53,15 @@ export const App = () => {
     </ArbitrageProvider>
   )
 }
+
+export const App = () => (
+  <Routes>
+    <Route element={<Layout />}>
+      <Route index element={<Navigate to="/arbitrage" replace />} />
+      <Route path="arbitrage" element={<ArbitrageWidget />} />
+      <Route path="trends" element={<TrendsWidget />} />
+      <Route path="atlas" element={<AtlasWidget />} />
+      <Route path="*" element={<Navigate to="/arbitrage" replace />} />
+    </Route>
+  </Routes>
+)

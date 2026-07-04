@@ -1,4 +1,4 @@
-import { EXCHANGE_TYPES } from '@poe2-dashboard/shared'
+import { DEFAULT_MIN_PROFIT, DEFAULT_MIN_VOLUME, EXCHANGE_TYPES } from '@poe2-dashboard/shared'
 import { ChevronDown, ChevronRight, RotateCcw } from 'lucide-react'
 import { useState } from 'react'
 
@@ -6,13 +6,13 @@ import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
 import { CategoryFilter } from './CategoryFilter.js'
-import { DEFAULT_MIN_PROFIT, DEFAULT_MIN_VOLUME, useArbitrageContext } from './context.js'
+import { useArbitrageContext } from './context.js'
 
 type ThresholdFieldProps = {
   id: string
   label: string
   value: number
-  onChange: React.Dispatch<React.SetStateAction<number>>
+  onChange: (value: number) => void
   suffix?: string
 }
 
