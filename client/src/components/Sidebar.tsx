@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
 type NavItem = { section: string; path: string; label: string; Icon: React.ElementType }
 
 const NAV_ITEMS: NavItem[] = [
-  { section: 'arbitrage', path: '/arbitrage', label: 'Arbitrage', Icon: ArrowLeftRight },
+  { section: 'exchanges', path: '/exchanges', label: 'Exchanges', Icon: ArrowLeftRight },
   { section: 'trends', path: '/trends', label: 'Meta Trends', Icon: TrendingUp },
   { section: 'atlas', path: '/atlas', label: 'Atlas Strategies', Icon: Map },
 ]

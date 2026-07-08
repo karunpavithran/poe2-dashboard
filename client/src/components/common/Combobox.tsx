@@ -52,6 +52,11 @@ export const Combobox = ({
     onSelectedItemChange: ({ selectedItem }) => {
       if (selectedItem != null) onChange(selectedItem)
     },
+    // Clicking the input toggles the menu by default; combined with our
+    // open-on-focus that means a fresh click opens (focus) then instantly
+    // closes (click toggle). Force a click to always open instead.
+    stateReducer: (_state, { type, changes }) =>
+      type === useCombobox.stateChangeTypes.InputClick ? { ...changes, isOpen: true } : changes,
   })
 
   return (

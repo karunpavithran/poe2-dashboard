@@ -10,7 +10,7 @@
   "scripts": {
     "dev:server": "npm run dev -w server",
     "dev:client": "npm run dev -w client",
-    "test": "npm run test -w server",
+    "test": "npm run test -w packages/shared -w server",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "eslint": "eslint .",
     "eslint:fix": "eslint . --fix",

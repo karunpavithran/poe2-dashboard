@@ -1,4 +1,4 @@
-import type { RateEdge } from '@poe2-dashboard/shared'
+import type { RateEdge } from './domain.js'
 
 /** Adjacency map: from -> to -> edge. At most one edge per direction per pair. */
 export type RateGraph = Map<string, Map<string, RateEdge>>

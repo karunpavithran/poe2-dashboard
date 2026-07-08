@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",
+    "@fastify/compress": "^9.0.0",
     "@poe2-dashboard/shared": "*",
     "fastify": "^5.0.0",
     "fetch-extras": "^3.2.0",

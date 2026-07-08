@@ -3,14 +3,18 @@ import type { z } from 'zod'
 import type {
   ArbitrageLegSchema,
   ArbitrageSchema,
-  ArbitrageSnapshotSchema,
   AscendancyTrendSchema,
   AtlasStrategySchema,
+  BestExchangeMapSchema,
   CurrencyIconMapSchema,
   CurrencyValueMapSchema,
+  EconomySnapshotSchema,
   ExchangeTypeSchema,
+  HubNamesSchema,
+  HubPricesSchema,
   MainSkillTrendSchema,
   MasterTreeSchema,
+  RateEdgeSchema,
   TabletSlotSchema,
 } from './schemas.js'
 
@@ -18,15 +22,7 @@ import type {
 export type ExchangeType = z.infer<typeof ExchangeTypeSchema>
 
 /** A single directed exchange: 1 unit of `from` buys `rate` units of `to`. */
-export type RateEdge = {
-  from: string
-  to: string
-  rate: number
-  /** Listing/volume count for this direction — liquidity signal. */
-  volume: number
-  /** Which exchange category's page this edge came from. */
-  category: ExchangeType
-}
+export type RateEdge = z.infer<typeof RateEdgeSchema>
 
 /** One leg of an arbitrage, echoing the edge it was built from. */
 export type ArbitrageLeg = z.infer<typeof ArbitrageLegSchema>
@@ -34,8 +30,8 @@ export type ArbitrageLeg = z.infer<typeof ArbitrageLegSchema>
 /** A profitable triangular cycle: start with 1 unit of cycle[0], end with 1 + profit. */
 export type Arbitrage = z.infer<typeof ArbitrageSchema>
 
-/** The Arbitrage widget's display data, persisted across restarts as a startup cache. */
-export type ArbitrageSnapshot = z.infer<typeof ArbitrageSnapshotSchema>
+/** The Exchanges widget's economy source, persisted across restarts as a startup cache. */
+export type EconomySnapshot = z.infer<typeof EconomySnapshotSchema>
 
 export type AscendancyTrend = z.infer<typeof AscendancyTrendSchema>
 
@@ -55,6 +51,15 @@ export type CurrencyIconMap = z.infer<typeof CurrencyIconMapSchema>
 
 /** Maps each currency name to its value in Divine Orbs. */
 export type CurrencyValueMap = z.infer<typeof CurrencyValueMapSchema>
+
+/** One currency's best Divine-denominated rate against each anchor hub. */
+export type HubPrices = z.infer<typeof HubPricesSchema>
+
+/** Currency name → its per-hub best rates (buy or sell direction). */
+export type BestExchangeMap = z.infer<typeof BestExchangeMapSchema>
+
+/** The three anchor hubs' display names, keyed by their stable hub key. */
+export type HubNames = z.infer<typeof HubNamesSchema>
 
 /** Everything computed from one poll of poe.ninja. */
 export type Snapshot = {

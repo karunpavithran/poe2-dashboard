@@ -1,41 +1,16 @@
 import { readFile, writeFile } from 'node:fs/promises'
 
-import type {
-  ArbitragesResponse,
-  AtlasResponse,
-  BuildTrendsResponse,
-  ExchangeType,
-} from '@poe2-dashboard/shared'
-import { AtlasResponseSchema, ExchangeTypeSchema } from '@poe2-dashboard/shared'
+import compress from '@fastify/compress'
+import type { AtlasResponse, BuildTrendsResponse, EconomyResponse } from '@poe2-dashboard/shared'
+import { AtlasResponseSchema } from '@poe2-dashboard/shared'
 import { ATLAS_DATA_PATH } from '@poe2-dashboard/shared/atlas'
 import Fastify from 'fastify'
 
-import { applyFilters } from './filters.js'
 import type { PollerState } from './poller.js'
 import type { TwitchPollerState } from './twitch.js'
 import { toStreamsResponse } from './twitch.js'
 
-const parseNumber = (value: string | undefined): number | undefined => {
-  if (value === undefined) return undefined
-  const n = Number(value)
-  return Number.isFinite(n) ? n : undefined
-}
-
-/**
- * Parse the comma-separated `categories` param into a validated set. Unknown
- * values are dropped; an absent or empty param means no filtering (undefined).
- */
-const parseCategories = (value: string | undefined): Set<ExchangeType> | undefined => {
-  if (!value) return undefined
-  const selected = value
-    .split(',')
-    .map(part => ExchangeTypeSchema.safeParse(part.trim()))
-    .filter(result => result.success)
-    .map(result => result.data)
-  return selected.length > 0 ? new Set(selected) : undefined
-}
-
-export const createServer = (
+export const createServer = async (
   state: PollerState,
   league: string,
   twitchState: TwitchPollerState,
@@ -48,32 +23,34 @@ export const createServer = (
 ) => {
   const app = Fastify({ logger: true, disableRequestLogging: true })
 
+  // Gzip responses. The economy payload is a normalized edge list (a few hundred
+  // KB uncompressed) that compresses ~6x, so this is the cheapest win on transfer
+  // size. Must be awaited *before* the routes are defined so its onSend hook is
+  // installed by the time each route is registered (otherwise it never applies).
+  await app.register(compress)
+
   app.get('/api/health', () => ({
     ok: true,
     hasData: state.snapshot !== null,
     lastError: state.lastError,
   }))
 
-  app.get<{
-    Querystring: { minProfit?: string; minVolume?: string; categories?: string }
-  }>('/api/arbitrages', (req): ArbitragesResponse => {
-    const minProfitPct = parseNumber(req.query.minProfit)
-    const minVolume = parseNumber(req.query.minVolume)
-    const categories = parseCategories(req.query.categories)
+  // The *minimal economy source*: observed rate edges + the per-currency
+  // value/icon maps + hub names. All filtering and every derived view (arbitrage
+  // cycles, per-hub buy/sell rates, currency→category) is computed client-side
+  // from `edges`, so this route takes no query params and always returns the full
+  // set — the client fetches it once and re-derives without refetching.
+  app.get('/api/arbitrages', (): EconomyResponse => {
     const snapshot = state.snapshot
-
     return {
       league,
+      edges: state.edges,
+      currencyValues: state.currencyValues,
+      currencyIcons: state.currencyIcons,
+      hubs: state.hubs,
       updatedAt: snapshot?.fetchedAt ?? null,
       dataAgeMs: snapshot ? Date.now() - snapshot.fetchedAt : null,
       isRefreshing: state.isPolling,
-      arbitrages: applyFilters(state.arbitrages, {
-        minProfitPct,
-        minVolume,
-        categories,
-      }),
-      currencyIcons: state.currencyIcons,
-      currencyValues: state.currencyValues,
       lastError: state.lastError,
     }
   })

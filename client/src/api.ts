@@ -1,8 +1,18 @@
-import type { AtlasStrategy } from '@poe2-dashboard/shared'
+import type {
+  Arbitrage,
+  AtlasStrategy,
+  BestExchangeMap,
+  EconomyResponse,
+  ExchangeType,
+} from '@poe2-dashboard/shared'
 import {
-  ArbitragesResponseSchema,
   AtlasResponseSchema,
+  buildGraph,
   BuildTrendsResponseSchema,
+  computeBestExchange,
+  computeCurrencyCategories,
+  EconomyResponseSchema,
+  findTriangularArbitrages,
   StreamsResponseSchema,
 } from '@poe2-dashboard/shared'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -42,29 +52,57 @@ export const { useResource: useBuildTrends } = createResourceQuery({
   }),
 })
 
-// Every filter (categories, minProfit, minVolume) is applied client-side in
-// useArbitrages, so we fetch the full unfiltered set once under a stable key and
-// let the UI narrow it without ever refetching. The server returns the complete
-// superset when no thresholds are passed.
+// The server ships the minimal economy source (edges + value/icon maps + hubs);
+// we fetch it once under a stable key and derive every view client-side. All
+// filtering (categories, minProfit, minVolume) then happens over the derived
+// rows in useArbitrages without ever refetching.
 export const fetchArbitrages = async () => {
   const res = await fetch('/api/arbitrages')
   if (!res.ok) throw new Error(`Backend returned ${res.status}`)
-  const data = ArbitragesResponseSchema.parse(await res.json())
+  const data = EconomyResponseSchema.parse(await res.json())
   // Snapshot freshness summary: correlate `updatedAt` with the server's poller
   // `fetchedAt` log. A large `dataAgeMs` here means the client is sitting on a
   // stale snapshot — i.e. it hasn't refetched since the server got new data.
   console.log(
-    `[api] arbitrages received: ${data.arbitrages.length} rows, ` +
+    `[api] economy received: ${data.edges.length} edges, ` +
       `updatedAt=${data.updatedAt === null ? 'none' : new Date(data.updatedAt).toISOString()}, ` +
       `dataAgeMs=${data.dataAgeMs ?? 'n/a'}${data.lastError ? `, lastError=${data.lastError}` : ''}`,
   )
   return data
 }
 
+/**
+ * The economy source plus everything the client derives from `edges`: arbitrage
+ * cycles, per-hub buy/sell rates, and currency→category. Downstream components
+ * read these fields exactly as they did when the server precomputed them.
+ */
+export type DerivedEconomy = EconomyResponse & {
+  arbitrages: Arbitrage[]
+  bestBuy: BestExchangeMap
+  bestSell: BestExchangeMap
+  currencyCategories: Record<string, ExchangeType[]>
+}
+
+// Runs inside the query fn (once per fetch, then cached) — see createResourceQuery.
+// The triangular search is edge-driven and sparse, so this is tens of ms even at
+// full scale; if it ever grows, move it to a web worker.
+const deriveEconomy = (raw: EconomyResponse): DerivedEconomy => {
+  const graph = buildGraph(raw.edges)
+  const { bestBuy, bestSell } = computeBestExchange(graph, raw.currencyValues, raw.hubs)
+  return {
+    ...raw,
+    arbitrages: findTriangularArbitrages(graph),
+    bestBuy,
+    bestSell,
+    currencyCategories: computeCurrencyCategories(raw.edges, raw.hubs),
+  }
+}
+
 export const { useResource: useArbitragesQuery, queryKey: arbitragesQueryKey } =
   createResourceQuery({
     name: 'arbitrages',
     fetcher: fetchArbitrages,
+    transform: deriveEconomy,
   })
 
 // Ask the server to kick a fresh economy poll. Reading GET /api/arbitrages only

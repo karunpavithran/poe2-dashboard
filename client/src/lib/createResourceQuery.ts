@@ -1,7 +1,7 @@
 import type {
-  ArbitragesResponse,
   AtlasStrategy,
   BuildTrendsResponse,
+  EconomyResponse,
   StreamsResponse,
 } from '@poe2-dashboard/shared'
 import type { UseSuspenseQueryResult } from '@tanstack/react-query'
@@ -12,7 +12,8 @@ type Resource = 'streams' | 'buildTrends' | 'arbitrages' | 'atlas'
 type ResourceDataMap = {
   streams: StreamsResponse
   buildTrends: BuildTrendsResponse
-  arbitrages: ArbitragesResponse
+  // Raw wire shape; the arbitrages resource `transform`s this into DerivedEconomy.
+  arbitrages: EconomyResponse
   atlas: AtlasStrategy[]
 }
 

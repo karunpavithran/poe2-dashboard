@@ -1,9 +1,8 @@
+import { buildGraph, findTriangularArbitrages } from '@poe2-dashboard/shared'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { findTriangularArbitrages } from '../src/arbitrage.js'
 import type { PoeNinjaDetailsResponse, PoeNinjaOverviewResponse } from '../src/poeNinja.js'
 import { buildEdges, fetchOverview } from '../src/poeNinja.js'
-import { buildGraph } from './../src/graph.js'
 
 // Rates below are real observations captured June 12, 2026. The two
 // directions of each pair were independently observed, so round trips lose

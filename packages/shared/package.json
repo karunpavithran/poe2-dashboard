@@ -9,10 +9,12 @@
     "./arbitrageSnapshot": "./src/arbitrageSnapshot.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "devDependencies": {
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
   },
   "dependencies": {
     "zod": "^4.4.3"

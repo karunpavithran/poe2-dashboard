@@ -15,7 +15,12 @@ const twitchPoller = createTwitchPoller({
 })
 twitchPoller.start()
 
-const app = createServer(poller.state, league, twitchPoller.state, () => void poller.pollOnce())
+const app = await createServer(
+  poller.state,
+  league,
+  twitchPoller.state,
+  () => void poller.pollOnce(),
+)
 
 app.listen({ port, host: '127.0.0.1' }).catch(err => {
   console.error(err)

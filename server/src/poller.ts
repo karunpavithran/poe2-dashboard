@@ -1,12 +1,16 @@
 import { readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 
-import type { Arbitrage, AscendancyTrend, MainSkillTrend, Snapshot } from '@poe2-dashboard/shared'
-import { ArbitrageSnapshotSchema } from '@poe2-dashboard/shared'
+import type {
+  AscendancyTrend,
+  HubNames,
+  MainSkillTrend,
+  RateEdge,
+  Snapshot,
+} from '@poe2-dashboard/shared'
+import { EconomySnapshotSchema } from '@poe2-dashboard/shared'
 import { ARBITRAGE_SNAPSHOT_PATH } from '@poe2-dashboard/shared/arbitrageSnapshot'
 
-import { findTriangularArbitrages } from './arbitrage.js'
-import { buildGraph } from './graph.js'
 import { fetchAscendancyTrends, fetchEconomy, fetchMainSkills, toSnapshot } from './poeNinja.js'
 
 export type PollerOptions = {
@@ -16,10 +20,17 @@ export type PollerOptions = {
 
 export type PollerState = {
   snapshot: Snapshot | null
-  /** Unfiltered, sorted by profit desc. Route handlers filter on read. */
-  arbitrages: Arbitrage[]
+  /**
+   * Every observed directed exchange edge from the last poll — the *minimal
+   * economy source*. The client rebuilds the rate graph and derives arbitrage
+   * cycles, per-hub buy/sell rates, and currency→category from these, so the
+   * server ships them as-is rather than precomputing those views.
+   */
+  edges: RateEdge[]
   currencyIcons: Record<string, string>
   currencyValues: Record<string, number>
+  /** The three anchor hubs' display names, for labelling the buy/sell comparison. */
+  hubs: HubNames
   ascendancyTrends: AscendancyTrend[]
   mainSkills: MainSkillTrend[]
   lastError: string | null
@@ -34,44 +45,44 @@ export type PollerState = {
 export const createPoller = (options: PollerOptions) => {
   const state: PollerState = {
     snapshot: null,
-    arbitrages: [],
+    edges: [],
     currencyIcons: {},
     currencyValues: {},
+    hubs: { divine: 'Divine Orb', exalted: 'Exalted Orb', chaos: 'Chaos Orb' },
     ascendancyTrends: [],
     mainSkills: [],
     lastError: null,
     isPolling: false,
   }
 
-  // Rehydrate the Arbitrage widget's data from the last run so the UI renders
+  // Rehydrate the Exchanges widget's data from the last run so the UI renders
   // immediately instead of the empty "Fetching rates…" state while the first
   // multi-minute poll runs. Best-effort: a missing/invalid/foreign-league cache
   // just leaves state empty, and the first poll fills (and overwrites) it.
   try {
-    const cached = ArbitrageSnapshotSchema.parse(
+    const cached = EconomySnapshotSchema.parse(
       JSON.parse(readFileSync(ARBITRAGE_SNAPSHOT_PATH, 'utf8')),
     )
     if (cached.league === options.league) {
       state.snapshot = {
         league: cached.league,
         sourceTimestamp: null,
-        // edges aren't served or reused — the next poll recomputes them from a
-        // fresh fetch — so an empty list here is enough to drive the age badge.
         fetchedAt: cached.fetchedAt,
-        edges: [],
+        edges: cached.edges,
       }
-      state.arbitrages = cached.arbitrages
+      state.edges = cached.edges
       state.currencyIcons = cached.currencyIcons
       state.currencyValues = cached.currencyValues
+      state.hubs = cached.hubs
       console.log(
-        `[poller] restored ${cached.arbitrages.length} arbitrages from cache ` +
+        `[poller] restored ${cached.edges.length} edges from cache ` +
           `(fetchedAt=${new Date(cached.fetchedAt).toISOString()})`,
       )
     }
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
       console.warn(
-        `[poller] could not load arbitrage snapshot cache: ${err instanceof Error ? err.message : err}`,
+        `[poller] could not load economy snapshot cache: ${err instanceof Error ? err.message : err}`,
       )
     }
   }
@@ -97,29 +108,32 @@ export const createPoller = (options: PollerOptions) => {
       const economy = await fetchEconomy(options.league)
       const snapshot = toSnapshot(economy.edges, options.league)
       state.snapshot = snapshot
-      state.arbitrages = findTriangularArbitrages(buildGraph(snapshot.edges))
+      // Ship the raw edges; the client derives cycles and per-hub rates from them.
+      state.edges = snapshot.edges
+      state.hubs = economy.hubs
       state.currencyIcons = economy.icons
       state.currencyValues = economy.values
       state.lastError = null
       console.log(
-        `[poller] poll complete in ${Date.now() - start}ms: ${economy.edges.length} edges, ` +
-          `${state.arbitrages.length} arbitrages, snapshot fetchedAt=${new Date(snapshot.fetchedAt).toISOString()}`,
+        `[poller] poll complete in ${Date.now() - start}ms: ${snapshot.edges.length} edges, ` +
+          `snapshot fetchedAt=${new Date(snapshot.fetchedAt).toISOString()}`,
       )
-      // Persist the widget's display data so the next startup can render it
+      // Persist the widget's source data so the next startup can render it
       // immediately. Fire-and-forget: a write failure shouldn't fail the poll.
       void writeFile(
         ARBITRAGE_SNAPSHOT_PATH,
         `${JSON.stringify({
           league: snapshot.league,
           fetchedAt: snapshot.fetchedAt,
-          arbitrages: state.arbitrages,
-          currencyIcons: state.currencyIcons,
+          edges: state.edges,
           currencyValues: state.currencyValues,
+          currencyIcons: state.currencyIcons,
+          hubs: state.hubs,
         })}\n`,
         'utf8',
       ).catch(err => {
         console.warn(
-          `[poller] could not write arbitrage snapshot cache: ${err instanceof Error ? err.message : err}`,
+          `[poller] could not write economy snapshot cache: ${err instanceof Error ? err.message : err}`,
         )
       })
       // Build data fetches are best-effort — failure doesn't invalidate currency data.
@@ -154,9 +168,8 @@ export const createPoller = (options: PollerOptions) => {
       state.lastError = err instanceof Error ? err.message : String(err)
       console.error(`[poller] poll failed after ${Date.now() - start}ms: ${state.lastError}`)
     } finally {
-      // Released once the economy fetch + arbitrage compute finishes; the
-      // best-effort build-data fetches above are fire-and-forget and don't hold
-      // the next poll back.
+      // Released once the economy fetch finishes; the best-effort build-data
+      // fetches above are fire-and-forget and don't hold the next poll back.
       state.isPolling = false
     }
   }

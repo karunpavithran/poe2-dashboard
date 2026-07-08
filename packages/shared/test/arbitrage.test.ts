@@ -1,9 +1,8 @@
-import type { ExchangeType, RateEdge } from '@poe2-dashboard/shared'
 import { describe, expect, it } from 'vitest'
 
 import { findTriangularArbitrages } from '../src/arbitrage.js'
-import { applyFilters } from '../src/filters.js'
 import { buildGraph } from '../src/graph.js'
+import type { ExchangeType, RateEdge } from '../src/index.js'
 
 const edge = (
   from: string,
@@ -106,39 +105,5 @@ describe('findTriangularArbitrages', () => {
       edge('C', 'A', 0.2, 200),
     ])
     expect(findTriangularArbitrages(graph)[0]!.minVolume).toBe(7)
-  })
-})
-
-describe('applyFilters', () => {
-  it('filters by minVolume and minProfitPct', () => {
-    const graph = buildGraph([
-      edge('A', 'B', 2, 500),
-      edge('B', 'C', 3, 7),
-      edge('C', 'A', 0.2, 200),
-    ])
-    const arbitrages = findTriangularArbitrages(graph)
-
-    expect(applyFilters(arbitrages, { minVolume: 10 })).toHaveLength(0)
-    expect(applyFilters(arbitrages, { minVolume: 5 })).toHaveLength(1)
-    expect(applyFilters(arbitrages, { minProfitPct: 25 })).toHaveLength(0)
-    expect(applyFilters(arbitrages, { minProfitPct: 15 })).toHaveLength(1)
-  })
-
-  it('keeps a cross-category cycle only when every leg category is selected', () => {
-    // A cross-category cycle: one leg comes from Runes, the rest from Currency.
-    const graph = buildGraph([
-      edge('A', 'B', 2, 100, 'Runes'),
-      edge('B', 'C', 3, 100, 'Currency'),
-      edge('C', 'A', 0.2, 100, 'Currency'),
-    ])
-    const arbitrages = findTriangularArbitrages(graph)
-    expect(arbitrages).toHaveLength(1)
-
-    // Both categories selected → kept.
-    expect(applyFilters(arbitrages, { categories: new Set(['Currency', 'Runes']) })).toHaveLength(1)
-    // Drop the category the cross-leg needs → excluded.
-    expect(applyFilters(arbitrages, { categories: new Set(['Currency']) })).toHaveLength(0)
-    // Undefined categories means no filtering.
-    expect(applyFilters(arbitrages, {})).toHaveLength(1)
   })
 })

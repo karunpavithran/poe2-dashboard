@@ -1,17 +1,17 @@
 import type { z } from 'zod'
 
 import type {
-  ArbitragesParamsSchema,
-  ArbitragesResponseSchema,
   AtlasResponseSchema,
   BuildTrendsResponseSchema,
+  EconomyResponseSchema,
 } from './schemas.js'
 
-/** Query params accepted by GET /api/arbitrages. */
-export type ArbitragesQuery = z.infer<typeof ArbitragesParamsSchema>
-
-/** Response body of GET /api/arbitrages. */
-export type ArbitragesResponse = z.infer<typeof ArbitragesResponseSchema>
+/**
+ * Response body of GET /api/arbitrages — the minimal economy source (edges +
+ * value/icon maps + hubs + freshness meta). The client derives arbitrage cycles,
+ * per-hub rates, and currency→category from `edges`.
+ */
+export type EconomyResponse = z.infer<typeof EconomyResponseSchema>
 
 /** Response body of GET /api/build-trends. */
 export type BuildTrendsResponse = z.infer<typeof BuildTrendsResponseSchema>

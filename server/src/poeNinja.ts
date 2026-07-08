@@ -1,4 +1,10 @@
-import type { ExchangeType, MainSkillTrend, RateEdge, Snapshot } from '@poe2-dashboard/shared'
+import type {
+  ExchangeType,
+  HubNames,
+  MainSkillTrend,
+  RateEdge,
+  Snapshot,
+} from '@poe2-dashboard/shared'
 import { EXCHANGE_TYPES } from '@poe2-dashboard/shared'
 import { pipeline, withRateLimit, withRetry } from 'fetch-extras'
 import { z } from 'zod'
@@ -226,6 +232,27 @@ export const buildValueMap = (overview: PoeNinjaOverviewResponse): Record<string
   return map
 }
 
+/**
+ * Resolves the three anchor hubs' display names from the Currency overview's core:
+ * `primary` is Divine, `secondary` is Exalted, and the remaining core rate is
+ * Chaos. Every exchange category prices against these same hubs, so the Currency
+ * overview (always fetched, always required) is enough to name them once.
+ */
+export const resolveHubs = (overview: PoeNinjaOverviewResponse): HubNames => {
+  const namesById = new Map<string, string>()
+  for (const item of [...overview.items, ...overview.core.items]) {
+    namesById.set(item.id, item.name)
+  }
+  const name = (id: string): string => namesById.get(id) ?? id
+  const { primary, secondary, rates } = overview.core
+  const chaosId = Object.keys(rates).find(id => id !== primary && id !== secondary)
+  return {
+    divine: name(primary),
+    exalted: name(secondary),
+    chaos: chaosId ? name(chaosId) : name('chaos'),
+  }
+}
+
 export const buildEdges = (
   overview: PoeNinjaOverviewResponse,
   detailsList: PoeNinjaDetailsResponse[],
@@ -291,6 +318,8 @@ export type EconomySnapshot = {
   edges: RateEdge[]
   icons: Record<string, string>
   values: Record<string, number>
+  /** The three anchor hubs' display names, resolved from the Currency overview. */
+  hubs: HubNames
 }
 
 /**
@@ -304,6 +333,9 @@ export const fetchEconomy = async (league: string, concurrency = 4): Promise<Eco
   const edges: RateEdge[] = []
   const icons: Record<string, string> = {}
   const values: Record<string, number> = {}
+  // Set from the Currency overview below — the essential hub category, fetched
+  // first and required, so this is always populated before we return.
+  let hubs: HubNames | null = null
   const economyStart = Date.now()
   console.log(
     `[poeNinja] economy poll started for league "${league}" across ${EXCHANGE_TYPES.length} categories`,
@@ -321,6 +353,7 @@ export const fetchEconomy = async (league: string, concurrency = 4): Promise<Eco
       )
       continue
     }
+    if (type === 'Currency') hubs = resolveHubs(overview)
     const detailsList = await fetchAllDetails(league, type, overview, concurrency)
     const categoryEdges = buildEdges(overview, detailsList, type)
     edges.push(...categoryEdges)
@@ -335,7 +368,10 @@ export const fetchEconomy = async (league: string, concurrency = 4): Promise<Eco
   console.log(
     `[poeNinja] economy poll complete: ${edges.length} edges total in ${Date.now() - economyStart}ms`,
   )
-  return { edges, icons, values }
+  // hubs is set from the required Currency category; if it somehow isn't, the poll
+  // has no usable data and the caller should treat it as a failed poll.
+  if (!hubs) throw new Error('economy poll produced no Currency overview to resolve hubs from')
+  return { edges, icons, values, hubs }
 }
 
 const BuildIndexSchema = z.object({

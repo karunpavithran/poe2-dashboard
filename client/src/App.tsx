@@ -3,11 +3,20 @@ import type { FallbackProps } from 'react-error-boundary'
 import { ErrorBoundary } from 'react-error-boundary'
 import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router'
 
+// Redirect that carries the query string along, so old /arbitrage?minProfit=…
+// deep links keep their filters when they land on /exchanges/arbitrage.
+const RedirectPreservingQuery = ({ to }: { to: string }) => {
+  const { search } = useLocation()
+  return <Navigate to={{ pathname: to, search }} replace />
+}
+
 import { Sidebar } from './components/Sidebar.js'
 import { Card, CardContent } from './components/ui/card.js'
-import { ArbitrageWidget } from './widgets/arbitrage/ArbitrageWidget.js'
+import { ArbitrageTab } from './widgets/arbitrage/ArbitrageTab.js'
 import { ArbitrageProvider } from './widgets/arbitrage/context.js'
 import { AtlasWidget } from './widgets/atlas/AtlasWidget.js'
+import { ExchangesWidget } from './widgets/exchanges/ExchangesWidget.js'
+import { ExplorerTab } from './widgets/exchanges/ExplorerTab.js'
 import { TrendsWidget } from './widgets/trends/TrendsWidget.js'
 
 const WidgetSkeleton = () => (
@@ -57,11 +66,18 @@ const Layout = () => {
 export const App = () => (
   <Routes>
     <Route element={<Layout />}>
-      <Route index element={<Navigate to="/arbitrage" replace />} />
-      <Route path="arbitrage" element={<ArbitrageWidget />} />
+      <Route index element={<Navigate to="/exchanges" replace />} />
+      <Route path="exchanges" element={<ExchangesWidget />}>
+        <Route index element={<ExplorerTab />} />
+        <Route path="cycles" element={<ArbitrageTab />} />
+        {/* Back-compat: the cycle table used to live at /exchanges/arbitrage. */}
+        <Route path="arbitrage" element={<RedirectPreservingQuery to="/exchanges/cycles" />} />
+      </Route>
+      {/* Back-compat: the widget used to live at /arbitrage. */}
+      <Route path="arbitrage" element={<RedirectPreservingQuery to="/exchanges/cycles" />} />
       <Route path="trends" element={<TrendsWidget />} />
       <Route path="atlas" element={<AtlasWidget />} />
-      <Route path="*" element={<Navigate to="/arbitrage" replace />} />
+      <Route path="*" element={<Navigate to="/exchanges" replace />} />
     </Route>
   </Routes>
 )

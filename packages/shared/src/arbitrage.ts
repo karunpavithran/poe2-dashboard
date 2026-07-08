@@ -1,5 +1,4 @@
-import type { Arbitrage, ArbitrageLeg } from '@poe2-dashboard/shared'
-
+import type { Arbitrage, ArbitrageLeg } from './domain.js'
 import type { RateGraph } from './graph.js'
 
 /**

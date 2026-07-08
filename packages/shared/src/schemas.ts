@@ -53,13 +53,13 @@ export const EXCHANGE_CATEGORY_LABELS: Record<z.infer<typeof ExchangeTypeSchema>
   Verisium: 'Verisium',
 }
 
-// --- Arbitrage (GET /api/arbitrages) ---
+// --- Economy (GET /api/arbitrages) ---
 
 // Building blocks the exported schemas compose from, so a future change to the
-// cycle arity, the icon-map shape, or the fields shared by every arbitrage
-// payload fans out from a single spot. `triple` and `ArbitragePayloadSchema`
-// stay module-private; CurrencyIconMapSchema is exported so domain.ts can derive
-// the CurrencyIconMap type from it.
+// cycle arity, the icon-map shape, or the fields shared by the response and the
+// persisted snapshot fans out from a single spot. `triple` and
+// `EconomyPayloadSchema` stay module-private; CurrencyIconMapSchema is exported
+// so domain.ts can derive the CurrencyIconMap type from it.
 
 /** Exactly three of `schema` — the fixed arity of a triangular arbitrage (3 currencies, 3 legs). */
 const triple = <T extends z.ZodTypeAny>(schema: T) => z.tuple([schema, schema, schema])
@@ -70,8 +70,46 @@ export const CurrencyIconMapSchema = z.record(z.string(), z.string())
 /** Currency name → its mid value in Divine Orbs (Divine Orb itself maps to 1). */
 export const CurrencyValueMapSchema = z.record(z.string(), z.number())
 
-/** One leg of an arbitrage, echoing the edge it was built from. */
-export const ArbitrageLegSchema = z.object({
+/**
+ * The three anchor hubs every exchange market prices against. The keys are stable
+ * (poe.ninja's `core.primary`/`secondary` plus chaos), so the client can label the
+ * comparison rows without knowing each hub's display name.
+ */
+export const HUB_KEYS = ['divine', 'exalted', 'chaos'] as const
+
+/**
+ * For one currency, the best Divine-denominated rate against each hub. `null`
+ * means no honest route exists to/from that hub (we never invert observed rates,
+ * so a direction with no observed market stays absent). Populated per-direction:
+ * in `bestBuy` a value is Divine *paid* to acquire 1 unit (lower is better); in
+ * `bestSell` it's Divine *received* for 1 unit (higher is better).
+ */
+export const HubPricesSchema = z.object({
+  divine: z.number().nullable(),
+  exalted: z.number().nullable(),
+  chaos: z.number().nullable(),
+})
+
+/** Currency name → its per-hub best rates (see HubPricesSchema). */
+export const BestExchangeMapSchema = z.record(z.string(), HubPricesSchema)
+
+/**
+ * The three anchor hubs' display names, keyed by their stable hub key — so the
+ * client can label the comparison rows and resolve each hub's icon without
+ * hardcoding currency names. The default matches PoE2's fixed anchors and only
+ * applies to caches written before this field existed.
+ */
+export const HubNamesSchema = z
+  .object({ divine: z.string(), exalted: z.string(), chaos: z.string() })
+  .default({ divine: 'Divine Orb', exalted: 'Exalted Orb', chaos: 'Chaos Orb' })
+
+/**
+ * A single directed exchange edge: 1 unit of `from` buys `rate` units of `to`.
+ * This is the canonical wire shape for the economy — the API ships an array of
+ * these and the client rebuilds the rate graph (and from it the arbitrage cycles
+ * and per-hub buy/sell rates) rather than the server precomputing those views.
+ */
+export const RateEdgeSchema = z.object({
   from: z.string(),
   to: z.string(),
   rate: z.number(),
@@ -80,6 +118,9 @@ export const ArbitrageLegSchema = z.object({
   /** Which exchange category's page this rate came from. */
   category: ExchangeTypeSchema,
 })
+
+/** One leg of an arbitrage is exactly one observed edge. */
+export const ArbitrageLegSchema = RateEdgeSchema
 
 /** A profitable triangular cycle: start with 1 unit of cycle[0], end with 1 + profit. */
 export const ArbitrageSchema = z.object({
@@ -95,30 +136,28 @@ export const ArbitrageSchema = z.object({
   minVolume: z.number(),
 })
 
-/** Fields shared by every arbitrage payload — the live API response and the persisted snapshot. */
-const ArbitragePayloadSchema = z.object({
+/**
+ * Fields shared by the live API response and the persisted snapshot — the
+ * *minimal economy source*. We ship the observed rate `edges` plus the
+ * per-currency value/icon maps and hub names; the client rebuilds the graph and
+ * derives arbitrage cycles, per-hub buy/sell rates, and currency→category from it
+ * (buildGraph / findTriangularArbitrages / computeBestExchange /
+ * computeCurrencyCategories). Keeping derivation client-side means a new view
+ * costs no server/schema change and the wire stays a normalized edge list.
+ */
+const EconomyPayloadSchema = z.object({
   league: z.string(),
-  arbitrages: z.array(ArbitrageSchema),
-  currencyIcons: CurrencyIconMapSchema,
+  /** Every observed directed exchange edge — the graph the client derives from. */
+  edges: z.array(RateEdgeSchema).default([]),
   /**
-   * Currency name → value in Divine Orbs, so the client can total a trade's net
-   * across currencies in one unit. Defaults to empty for older cached snapshots
-   * written before this field existed.
+   * Currency name → value in Divine Orbs (Divine Orb itself = 1), so the client
+   * can normalize rates and total a trade's net across currencies in one unit.
    */
   currencyValues: CurrencyValueMapSchema.default({}),
-})
-
-export const ArbitragesParamsSchema = z.object({
-  /** Minimum profit percent, e.g. 2 means only cycles paying >= 2%. */
-  minProfit: z.coerce.number().optional(),
-  /** Minimum per-leg volume. */
-  minVolume: z.coerce.number().optional(),
-  /**
-   * Comma-separated exchange categories to include (e.g. "Currency,Runes").
-   * A cycle is kept only if every leg comes from a selected category. Omitted
-   * means all categories.
-   */
-  categories: z.string().optional(),
+  /** Currency name → poecdn.com icon URL. */
+  currencyIcons: CurrencyIconMapSchema.default({}),
+  /** The three anchor hubs' display names, for labelling the buy/sell comparison. */
+  hubs: HubNamesSchema,
 })
 
 // --- Arbitrage filter state (client URL query params) ---
@@ -139,9 +178,8 @@ export const DEFAULT_MIN_VOLUME = 10
  * sensible view instead of throwing:
  *   - minProfit / minVolume: coerced from string; a missing, non-numeric, or
  *     negative value falls back to its default.
- *   - categories: comma-separated ExchangeType list (mirrors the server's
- *     ArbitragesParamsSchema `categories`), deduped, with unknown tokens
- *     dropped. An *absent* param means "all categories" (no filter); a *present*
+ *   - categories: comma-separated ExchangeType list, deduped, with unknown
+ *     tokens dropped. An *absent* param means "all categories" (no filter); a *present*
  *     one is taken literally, so an empty string round-trips the "none selected"
  *     state (an empty table) rather than snapping back to all.
  */
@@ -180,8 +218,8 @@ export const arbitrageFiltersToParams = (filters: ArbitrageFilters): Record<stri
   return params
 }
 
-export const ArbitragesResponseSchema = ArbitragePayloadSchema.extend({
-  /** ms epoch of the snapshot the arbitrages were computed from. */
+export const EconomyResponseSchema = EconomyPayloadSchema.extend({
+  /** ms epoch of the snapshot these edges were computed from. */
   updatedAt: z.number().nullable(),
   /** Age of that snapshot in ms at response time, null before first successful poll. */
   dataAgeMs: z.number().nullable(),
@@ -198,11 +236,12 @@ export const ArbitragesResponseSchema = ArbitragePayloadSchema.extend({
 
 /**
  * Written to disk after each successful economy poll and reloaded on startup so
- * the Arbitrage widget can render the last good data immediately instead of
- * nothing while the first poll (which takes minutes) runs. Only the data the
- * widget displays is cached — build trends refetch quickly and aren't persisted.
+ * the Exchanges widget can render the last good data immediately instead of
+ * nothing while the first poll (which takes minutes) runs. Stores the same
+ * minimal source the API serves — edges + value/icon maps + hubs — since the
+ * client derives everything else.
  */
-export const ArbitrageSnapshotSchema = ArbitragePayloadSchema.extend({
+export const EconomySnapshotSchema = EconomyPayloadSchema.extend({
   /** ms epoch of the poll this was computed from; drives the UI's data-age badge. */
   fetchedAt: z.number(),
 })
