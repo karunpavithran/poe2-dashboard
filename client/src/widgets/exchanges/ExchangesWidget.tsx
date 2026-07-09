@@ -18,9 +18,9 @@ const tabClass = ({ isActive }: { isActive: boolean }): string =>
 
 /**
  * The Exchanges widget: a shell around two submodules that share one snapshot —
- * "Explorer" (a currency-centric master–detail: per-currency buy/sell rates across
- * the anchor hubs plus the cycles it's part of) and "Browse cycles" (the
- * triangular-cycle table). The Card, freshness badge, and poll-error banner are
+ * "Cycles" (the triangular-cycle table, the default tab) and "Explorer" (a
+ * currency-centric master–detail: per-currency buy/sell rates across the anchor
+ * hubs plus the cycles it's part of). The Card, freshness badge, and poll-error banner are
  * shared here; each submodule renders as the routed <Outlet/> below. Freshness
  * reads the economy query, since data age and poll errors are snapshot-level.
  */
@@ -35,10 +35,10 @@ export const ExchangesWidget = () => {
         <CardTitle>Exchanges</CardTitle>
         <nav className="flex gap-0.5 rounded-lg bg-muted/50 p-0.5">
           <NavLink to="/exchanges" end className={tabClass}>
-            Explorer
+            Cycles
           </NavLink>
-          <NavLink to="/exchanges/cycles" className={tabClass}>
-            Browse cycles
+          <NavLink to="/exchanges/explorer" className={tabClass}>
+            Explorer
           </NavLink>
         </nav>
         <div className="ml-auto">

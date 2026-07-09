@@ -68,13 +68,15 @@ export const App = () => (
     <Route element={<Layout />}>
       <Route index element={<Navigate to="/exchanges" replace />} />
       <Route path="exchanges" element={<ExchangesWidget />}>
-        <Route index element={<ExplorerTab />} />
-        <Route path="cycles" element={<ArbitrageTab />} />
-        {/* Back-compat: the cycle table used to live at /exchanges/arbitrage. */}
-        <Route path="arbitrage" element={<RedirectPreservingQuery to="/exchanges/cycles" />} />
+        <Route index element={<ArbitrageTab />} />
+        <Route path="explorer" element={<ExplorerTab />} />
+        {/* Back-compat: the cycle table used to live at /exchanges/cycles and,
+            before that, /exchanges/arbitrage — both are now the default tab. */}
+        <Route path="cycles" element={<RedirectPreservingQuery to="/exchanges" />} />
+        <Route path="arbitrage" element={<RedirectPreservingQuery to="/exchanges" />} />
       </Route>
       {/* Back-compat: the widget used to live at /arbitrage. */}
-      <Route path="arbitrage" element={<RedirectPreservingQuery to="/exchanges/cycles" />} />
+      <Route path="arbitrage" element={<RedirectPreservingQuery to="/exchanges" />} />
       <Route path="trends" element={<TrendsWidget />} />
       <Route path="atlas" element={<AtlasWidget />} />
       <Route path="*" element={<Navigate to="/exchanges" replace />} />
