@@ -318,7 +318,10 @@ export const MasterTreeSchema = z.object({
 
 /** A single atlas farming strategy. */
 export const AtlasStrategySchema = z.object({
-  /** Stable id; client-generated via crypto.randomUUID for new strategies. */
+  /**
+   * Stable id, server-generated (crypto.randomUUID) on create. Plain string, not
+   * uuid: legacy pre-DB strategies were seeded with hand-written slug ids.
+   */
   id: z.string(),
   name: z.string(),
   /** Optional guide/video URL. */
@@ -335,7 +338,28 @@ export const AtlasStrategySchema = z.object({
   tags: z.array(z.string()).default([]),
 })
 
-/** Response body of GET /api/atlas and request body of PUT /api/atlas. */
+/**
+ * Request body of POST /api/atlas and PUT /api/atlas/:id — everything but the
+ * id, which the server generates on create and takes from the route on update
+ * (a stray id in the body is stripped, never trusted).
+ */
+export const AtlasStrategyInputSchema = AtlasStrategySchema.omit({ id: true })
+
+/** Response body of GET /api/atlas: every strategy, most recently updated first. */
 export const AtlasResponseSchema = z.object({
   strategies: z.array(AtlasStrategySchema),
+})
+
+/**
+ * Route params for the per-strategy endpoints (PUT/DELETE /api/atlas/:id).
+ * Plain string, not uuid: pre-DB strategies used hand-written slug ids
+ * (e.g. "deli-travel-maps") and those remain valid.
+ */
+export const AtlasStrategyParamsSchema = z.object({
+  id: z.string().min(1),
+})
+
+/** Error body for non-2xx API responses. */
+export const ApiErrorSchema = z.object({
+  message: z.string(),
 })

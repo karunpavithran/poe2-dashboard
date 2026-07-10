@@ -5,8 +5,11 @@ dist/
 server/fixtures/*.json
 !server/fixtures/example-planted.json
 
-# Regenerable startup cache written after each successful economy poll.
-packages/shared/data/arbitrage-snapshot.json
+# Local SQLite database (dev default; Docker mounts a volume via DB_PATH).
+# Contents-only ignore (not the dir) so .gitkeep can hold the dir in place —
+# drizzle-kit migrate/studio won't create it and error if it's missing.
+server/data/*
+!server/data/.gitkeep
 
 # Local Claude Code settings (personal, not shared)
 .claude/settings.local.json

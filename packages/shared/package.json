@@ -5,8 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./atlas": "./src/atlas.ts",
-    "./arbitrageSnapshot": "./src/arbitrageSnapshot.ts"
+    "./atlas": "./src/atlas.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

@@ -1,3 +1,4 @@
+import { runMigrations } from './db/client.js'
 import { createPoller } from './poller.js'
 import { createServer } from './server.js'
 import { createTwitchPoller } from './twitch.js'
@@ -5,6 +6,10 @@ import { createTwitchPoller } from './twitch.js'
 const league = process.env.LEAGUE ?? 'Runes of Aldur'
 const intervalMs = Number(process.env.POLL_INTERVAL_MS ?? 60 * 60 * 1000)
 const port = Number(process.env.PORT ?? 3000)
+
+// Bring the DB up to date before anything can touch it. Synchronous: routes
+// aren't registered and pollers aren't started until the schema is current.
+runMigrations()
 
 const poller = createPoller({ league, intervalMs })
 poller.start()

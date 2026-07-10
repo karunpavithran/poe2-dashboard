@@ -1,4 +1,4 @@
-import type { AtlasStrategy, TabletSlot } from '@poe2-dashboard/shared'
+import type { TabletSlot } from '@poe2-dashboard/shared'
 import { Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -9,13 +9,14 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 
 import { ChipInput } from './ChipInput.js'
+import type { StrategyDraft } from './constants.js'
 import { MASTER_NAMES, TABLET_TYPES } from './constants.js'
 
 type StrategyEditorProps = {
-  initial: AtlasStrategy
+  initial: StrategyDraft
   isExisting: boolean
   isSaving: boolean
-  onSave: (strategy: AtlasStrategy) => void
+  onSave: (draft: StrategyDraft) => void
   onCancel: () => void
 }
 
@@ -28,7 +29,7 @@ export const StrategyEditor = ({
   onSave,
   onCancel,
 }: StrategyEditorProps) => {
-  const [draft, setDraft] = useState<AtlasStrategy>(initial)
+  const [draft, setDraft] = useState<StrategyDraft>(initial)
 
   const updateTablet = (index: number, patch: Partial<TabletSlot>) =>
     setDraft(current => ({
@@ -128,9 +129,7 @@ export const StrategyEditor = ({
               id="strat-master"
               options={MASTER_NAMES}
               value={draft.master.name}
-              onChange={name =>
-                setDraft({ ...draft, master: { ...draft.master, name } })
-              }
+              onChange={name => setDraft({ ...draft, master: { ...draft.master, name } })}
             />
           </div>
           <div className="flex flex-col gap-1.5">

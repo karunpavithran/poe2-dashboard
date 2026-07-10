@@ -1,6 +1,7 @@
 import type {
   Arbitrage,
   AtlasStrategy,
+  AtlasStrategyInput,
   BestExchangeMap,
   EconomyResponse,
   ExchangeType,
@@ -130,12 +131,28 @@ export const fetchAtlas = async (): Promise<AtlasStrategy[]> => {
   return AtlasResponseSchema.parse(await res.json()).strategies
 }
 
-export const saveAtlas = async (strategies: AtlasStrategy[]): Promise<void> => {
+export const createStrategy = async (input: AtlasStrategyInput): Promise<void> => {
   const res = await fetch('/api/atlas', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) throw new Error(`Backend returned ${res.status}`)
+}
+
+// The id travels in the route, not the body (the server ignores a body id).
+export const updateStrategy = async (strategy: AtlasStrategy): Promise<void> => {
+  const { id, ...input } = strategy
+  const res = await fetch(`/api/atlas/${encodeURIComponent(id)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ strategies }),
+    body: JSON.stringify(input),
   })
+  if (!res.ok) throw new Error(`Backend returned ${res.status}`)
+}
+
+export const deleteStrategy = async (id: string): Promise<void> => {
+  const res = await fetch(`/api/atlas/${encodeURIComponent(id)}`, { method: 'DELETE' })
   if (!res.ok) throw new Error(`Backend returned ${res.status}`)
 }
 
@@ -144,12 +161,18 @@ export const { useResource: useAtlas, queryKey: atlasQueryKey } = createResource
   fetcher: fetchAtlas,
 })
 
-export const useSaveAtlas = () => {
+// The server owns display order (position) and timestamps, so mutations refetch
+// the authoritative list instead of patching the cache locally. Returning the
+// invalidate promise keeps the mutation `isPending` until the refetch lands, so
+// callers' onSuccess (e.g. closing the editor) fires against fresh data.
+const useAtlasMutation = <TInput>(mutationFn: (input: TInput) => Promise<void>) => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: saveAtlas,
-    onSuccess: (_, strategies) => {
-      queryClient.setQueryData(atlasQueryKey, strategies)
-    },
+    mutationFn,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: atlasQueryKey }),
   })
 }
+
+export const useCreateStrategy = () => useAtlasMutation(createStrategy)
+export const useUpdateStrategy = () => useAtlasMutation(updateStrategy)
+export const useDeleteStrategy = () => useAtlasMutation(deleteStrategy)

@@ -1,4 +1,10 @@
-import type { AtlasStrategy } from '@poe2-dashboard/shared'
+import type { AtlasStrategyInput } from '@poe2-dashboard/shared'
+
+/**
+ * Editor draft: the input fields plus the id when editing an existing strategy.
+ * New drafts carry no id — the server generates one on create.
+ */
+export type StrategyDraft = AtlasStrategyInput & { id?: string }
 
 /** Known atlas masters — used as datalist suggestions, free text still allowed. */
 export const MASTER_NAMES = ['Dory', 'Jado'] as const
@@ -17,8 +23,7 @@ export const TABLET_TYPES = [
   'Visions of Paradise',
 ] as const
 
-export const createEmptyStrategy = (): AtlasStrategy => ({
-  id: crypto.randomUUID(),
+export const createEmptyStrategy = (): StrategyDraft => ({
   name: '',
   master: { name: '', nodes: '' },
   tablets: [],

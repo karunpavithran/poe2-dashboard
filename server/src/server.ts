@@ -1,12 +1,9 @@
-import { readFile, writeFile } from 'node:fs/promises'
-
 import compress from '@fastify/compress'
-import type { AtlasResponse, BuildTrendsResponse, EconomyResponse } from '@poe2-dashboard/shared'
-import { AtlasResponseSchema } from '@poe2-dashboard/shared'
-import { ATLAS_DATA_PATH } from '@poe2-dashboard/shared/atlas'
+import type { BuildTrendsResponse, EconomyResponse } from '@poe2-dashboard/shared'
 import Fastify from 'fastify'
 
 import type { PollerState } from './poller.js'
+import { atlasRouter } from './slices/atlas/atlas.router.js'
 import type { TwitchPollerState } from './twitch.js'
 import { toStreamsResponse } from './twitch.js'
 
@@ -78,16 +75,7 @@ export const createServer = async (
     }),
   )
 
-  app.get('/api/atlas', async (): Promise<AtlasResponse> => {
-    const raw = await readFile(ATLAS_DATA_PATH, 'utf8')
-    return AtlasResponseSchema.parse(JSON.parse(raw))
-  })
-
-  app.put<{ Body: AtlasResponse }>('/api/atlas', async (req, reply) => {
-    const parsed = AtlasResponseSchema.parse(req.body)
-    await writeFile(ATLAS_DATA_PATH, `${JSON.stringify(parsed, null, 2)}\n`, 'utf8')
-    reply.code(204).send()
-  })
+  await app.register(atlasRouter, { prefix: '/api/atlas' })
 
   return app
 }

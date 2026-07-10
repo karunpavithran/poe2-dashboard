@@ -7,18 +7,26 @@
     "dev": "node --env-file=../.env --watch --import tsx/esm src/index.ts",
     "start": "node --env-file=../.env --import tsx/esm src/index.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "node --import tsx/esm scripts/seed-atlas.ts && node --import tsx/esm scripts/seed-economy.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",
     "@fastify/compress": "^9.0.0",
     "@poe2-dashboard/shared": "*",
+    "better-sqlite3": "^12.11.1",
+    "drizzle-orm": "^0.45.2",
     "fastify": "^5.0.0",
     "fetch-extras": "^3.2.0",
-    "pbf": "^5.1.0"
+    "pbf": "^5.1.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.0.0",
+    "drizzle-kit": "^0.31.10",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vitest": "^3.0.0"

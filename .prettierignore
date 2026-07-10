@@ -1,2 +1,5 @@
 node_modules
 dist
+
+# drizzle-kit-generated migrations + snapshots; never hand-edited or reformatted
+server/drizzle/

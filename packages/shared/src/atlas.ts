@@ -1,11 +1,9 @@
 import { fileURLToPath } from 'node:url'
 
 /**
- * Absolute path to the persisted Atlas strategies store. The server reads it on
- * GET /api/atlas and rewrites it on PUT /api/atlas, so it must stay a real file
- * on disk (not a bundled import). It lives in the shared package — outside any
- * app's source tree — so runtime writes don't trip the client dev server's file
- * watcher and force a full page reload.
+ * Absolute path to the LEGACY Atlas strategies JSON store. Strategies now live in
+ * the server's SQLite database; this file is read only by the one-time import
+ * (server/scripts/seed-atlas.ts) and is otherwise kept as a pre-DB backup.
  *
  * This module pulls in a Node builtin, so it is intentionally NOT re-exported
  * from the package index: only the server imports it (via the `./atlas` subpath),

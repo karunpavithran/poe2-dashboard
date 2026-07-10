@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs'
-import { writeFile } from 'node:fs/promises'
-
 import type {
   AscendancyTrend,
   HubNames,
@@ -8,10 +5,9 @@ import type {
   RateEdge,
   Snapshot,
 } from '@poe2-dashboard/shared'
-import { EconomySnapshotSchema } from '@poe2-dashboard/shared'
-import { ARBITRAGE_SNAPSHOT_PATH } from '@poe2-dashboard/shared/arbitrageSnapshot'
 
 import { fetchAscendancyTrends, fetchEconomy, fetchMainSkills, toSnapshot } from './poeNinja.js'
+import { loadSnapshot, saveSnapshot } from './slices/economy/economy.service.js'
 
 export type PollerOptions = {
   league: string
@@ -55,36 +51,26 @@ export const createPoller = (options: PollerOptions) => {
     isPolling: false,
   }
 
-  // Rehydrate the Exchanges widget's data from the last run so the UI renders
-  // immediately instead of the empty "Fetching rates…" state while the first
-  // multi-minute poll runs. Best-effort: a missing/invalid/foreign-league cache
-  // just leaves state empty, and the first poll fills (and overwrites) it.
-  try {
-    const cached = EconomySnapshotSchema.parse(
-      JSON.parse(readFileSync(ARBITRAGE_SNAPSHOT_PATH, 'utf8')),
+  // Rehydrate the Exchanges widget's data from the league's persisted snapshot
+  // so the UI renders immediately instead of the empty "Fetching rates…" state
+  // while the first multi-minute poll runs. An empty DB just leaves state
+  // empty, and the first poll fills it.
+  const cached = loadSnapshot(options.league)
+  if (cached) {
+    state.snapshot = {
+      league: cached.league,
+      sourceTimestamp: null,
+      fetchedAt: cached.fetchedAt,
+      edges: cached.edges,
+    }
+    state.edges = cached.edges
+    state.currencyIcons = cached.currencyIcons
+    state.currencyValues = cached.currencyValues
+    state.hubs = cached.hubs
+    console.log(
+      `[poller] restored ${cached.edges.length} edges from the last snapshot ` +
+        `(fetchedAt=${new Date(cached.fetchedAt).toISOString()})`,
     )
-    if (cached.league === options.league) {
-      state.snapshot = {
-        league: cached.league,
-        sourceTimestamp: null,
-        fetchedAt: cached.fetchedAt,
-        edges: cached.edges,
-      }
-      state.edges = cached.edges
-      state.currencyIcons = cached.currencyIcons
-      state.currencyValues = cached.currencyValues
-      state.hubs = cached.hubs
-      console.log(
-        `[poller] restored ${cached.edges.length} edges from cache ` +
-          `(fetchedAt=${new Date(cached.fetchedAt).toISOString()})`,
-      )
-    }
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
-      console.warn(
-        `[poller] could not load economy snapshot cache: ${err instanceof Error ? err.message : err}`,
-      )
-    }
   }
 
   let ascendancyFetchFailed = false
@@ -118,24 +104,23 @@ export const createPoller = (options: PollerOptions) => {
         `[poller] poll complete in ${Date.now() - start}ms: ${snapshot.edges.length} edges, ` +
           `snapshot fetchedAt=${new Date(snapshot.fetchedAt).toISOString()}`,
       )
-      // Persist the widget's source data so the next startup can render it
-      // immediately. Fire-and-forget: a write failure shouldn't fail the poll.
-      void writeFile(
-        ARBITRAGE_SNAPSHOT_PATH,
-        `${JSON.stringify({
+      // Persist the snapshot (replacing the league's previous one) so the next
+      // startup renders immediately. Best-effort: the in-memory state is
+      // already updated, so a persist failure shouldn't fail the poll.
+      try {
+        saveSnapshot({
           league: snapshot.league,
           fetchedAt: snapshot.fetchedAt,
           edges: state.edges,
           currencyValues: state.currencyValues,
           currencyIcons: state.currencyIcons,
           hubs: state.hubs,
-        })}\n`,
-        'utf8',
-      ).catch(err => {
+        })
+      } catch (err) {
         console.warn(
-          `[poller] could not write economy snapshot cache: ${err instanceof Error ? err.message : err}`,
+          `[poller] could not persist economy snapshot: ${err instanceof Error ? err.message : err}`,
         )
-      })
+      }
       // Build data fetches are best-effort — failure doesn't invalidate currency data.
       fetchAscendancyTrends(options.league)
         .then(trends => {

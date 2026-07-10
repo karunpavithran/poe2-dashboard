@@ -2,20 +2,24 @@ import type { AtlasStrategy } from '@poe2-dashboard/shared'
 import { Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
-import { useAtlas, useSaveAtlas } from '@/api.js'
+import { useAtlas, useCreateStrategy, useDeleteStrategy, useUpdateStrategy } from '@/api.js'
 import { FilterChip } from '@/components/common/FilterChip'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 
+import type { StrategyDraft } from './constants.js'
 import { createEmptyStrategy } from './constants.js'
 import { StrategyCard } from './StrategyCard.js'
 import { StrategyEditor } from './StrategyEditor.js'
 
 export const AtlasWidget = () => {
   const { atlas } = useAtlas()
-  const { mutate: saveAtlas, isPending: isSaving } = useSaveAtlas()
-  const [editing, setEditing] = useState<AtlasStrategy | null>(null)
+  const { mutate: createStrategy, isPending: isCreating } = useCreateStrategy()
+  const { mutate: updateStrategy, isPending: isUpdating } = useUpdateStrategy()
+  const { mutate: deleteStrategy } = useDeleteStrategy()
+  const isSaving = isCreating || isUpdating
+  const [editing, setEditing] = useState<StrategyDraft | null>(null)
   const [search, setSearch] = useState('')
   // Multi-select tag filter: a strategy must carry *every* selected tag (AND).
   const [activeTags, setActiveTags] = useState<Set<string>>(() => new Set())
@@ -48,25 +52,26 @@ export const AtlasWidget = () => {
       .filter(matchesTerm)
   }, [atlas, search, activeTags])
 
-  const isExisting = editing !== null && atlas.some(strategy => strategy.id === editing.id)
+  // A draft only carries an id if it came from the list; new/duplicated drafts
+  // have none until the server assigns one on create.
+  const isExisting = editing !== null && editing.id !== undefined
 
-  const handleSave = (strategy: AtlasStrategy) => {
-    const next = atlas.some(existing => existing.id === strategy.id)
-      ? atlas.map(existing => (existing.id === strategy.id ? strategy : existing))
-      : [...atlas, strategy]
-    saveAtlas(next, { onSuccess: () => setEditing(null) })
+  const handleSave = (draft: StrategyDraft) => {
+    const onSuccess = () => setEditing(null)
+    if (draft.id === undefined) createStrategy(draft, { onSuccess })
+    else updateStrategy({ ...draft, id: draft.id }, { onSuccess })
   }
 
   const handleDuplicate = (strategy: AtlasStrategy) =>
     setEditing({
       ...structuredClone(strategy),
-      id: crypto.randomUUID(),
+      id: undefined,
       name: `${strategy.name} (copy)`,
     })
 
   const handleDelete = (strategy: AtlasStrategy) => {
     if (!window.confirm(`Delete "${strategy.name}"?`)) return
-    saveAtlas(atlas.filter(existing => existing.id !== strategy.id))
+    deleteStrategy(strategy.id)
   }
 
   return (
@@ -74,7 +79,7 @@ export const AtlasWidget = () => {
       <CardContent className="flex h-full min-h-0 flex-col pt-4">
         {editing ? (
           <StrategyEditor
-            key={editing.id}
+            key={editing.id ?? 'new'}
             initial={editing}
             isExisting={isExisting}
             isSaving={isSaving}
