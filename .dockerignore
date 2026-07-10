@@ -1,0 +1,13 @@
+# Dependencies are installed in-image (native prebuilds must match the target
+# arch), and the client is built in-image.
+node_modules
+**/node_modules
+client/dist
+
+# Never bake secrets or local state into the image.
+.env
+server/data
+
+.git
+.claude
+*.log

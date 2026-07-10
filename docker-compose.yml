@@ -1,0 +1,15 @@
+services:
+  poe2-dashboard:
+    build: .
+    image: poe2-dashboard
+    ports:
+      - '3000:3000'
+    # Twitch credentials etc. — create this file next to the compose file on
+    # the Pi (it is gitignored and excluded from the image).
+    env_file: .env
+    volumes:
+      - poe2-data:/data
+    restart: unless-stopped
+
+volumes:
+  poe2-data:

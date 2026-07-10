@@ -1,4 +1,5 @@
 import compress from '@fastify/compress'
+import fastifyStatic from '@fastify/static'
 import type { BuildTrendsResponse, EconomyResponse } from '@poe2-dashboard/shared'
 import Fastify from 'fastify'
 
@@ -17,6 +18,12 @@ export const createServer = async (
    * completion via `isRefreshing`/`updatedAt` on subsequent GET /api/arbitrages.
    */
   refreshArbitrages: () => void,
+  /**
+   * Absolute path to the built client (Vite dist). Set in the Docker image so
+   * the one container serves API + SPA; unset in dev, where Vite's dev server
+   * owns the front end and proxies /api here.
+   */
+  clientDist?: string,
 ) => {
   const app = Fastify({ logger: true, disableRequestLogging: true })
 
@@ -76,6 +83,18 @@ export const createServer = async (
   )
 
   await app.register(atlasRouter, { prefix: '/api/atlas' })
+
+  if (clientDist) {
+    await app.register(fastifyStatic, { root: clientDist })
+    // SPA fallback: unknown non-API paths are client-side routes and get
+    // index.html; unknown /api paths stay JSON 404s.
+    app.setNotFoundHandler((req, reply) => {
+      if (req.url.startsWith('/api/')) {
+        return reply.code(404).send({ message: `Route ${req.method} ${req.url} not found` })
+      }
+      return reply.sendFile('index.html')
+    })
+  }
 
   return app
 }

@@ -6,6 +6,10 @@ import { createTwitchPoller } from './twitch.js'
 const league = process.env.LEAGUE ?? 'Runes of Aldur'
 const intervalMs = Number(process.env.POLL_INTERVAL_MS ?? 60 * 60 * 1000)
 const port = Number(process.env.PORT ?? 3000)
+// Loopback-only by default; the Docker image sets HOST=0.0.0.0 so the mapped
+// port is reachable from outside the container.
+const host = process.env.HOST ?? '127.0.0.1'
+const clientDist = process.env.CLIENT_DIST
 
 // Bring the DB up to date before anything can touch it. Synchronous: routes
 // aren't registered and pollers aren't started until the schema is current.
@@ -25,9 +29,10 @@ const app = await createServer(
   league,
   twitchPoller.state,
   () => void poller.pollOnce(),
+  clientDist,
 )
 
-app.listen({ port, host: '127.0.0.1' }).catch(err => {
+app.listen({ port, host }).catch(err => {
   console.error(err)
   process.exit(1)
 })
