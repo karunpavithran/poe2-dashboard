@@ -13,18 +13,11 @@
         {
           "type": "Deli",
           "quantity": 1,
-          "mods": [
-            "Fractured Mirror",
-            "Unique Boss",
-            "Splinters"
-          ],
+          "mods": ["Fractured Mirror", "Unique Boss", "Splinters"],
           "tradeUrl": "https://www.pathofexile.com/trade2/search/poe2/Runes%20of%20Aldur/Wv3Vy6oKHm"
         }
       ],
-      "tags": [
-        "travel",
-        "delirium"
-      ]
+      "tags": ["travel", "delirium"]
     },
     {
       "id": "tablet-travel-maps",
@@ -39,18 +32,12 @@
         {
           "type": "Irradiating",
           "quantity": 3,
-          "mods": [
-            "Map Effect",
-            "Waystones"
-          ],
+          "mods": ["Map Effect", "Waystones"],
           "tradeUrl": "https://www.pathofexile.com/trade2/search/poe2/Runes%20of%20Aldur/q9wXkPr3Ug"
         }
       ],
       "notes": "Tablet rolling: Trans → Aug → Alch if no good mods.\n\nMod priorities by tablet:\n- Abyss: chance for 4 extra abyss, extra rare mobs (1-3)\n- Breach: extra rare mobs, effectiveness of rares\n- Ritual: omen chance, additional rerolls\n- Temple: crystal and unique mob mods\n- Deli: unique mob spawn, inc splinters, inc fracturing mirrors",
-      "tags": [
-        "tablet",
-        "travel"
-      ]
+      "tags": ["tablet", "travel"]
     },
     {
       "id": "citadel-setup",
@@ -63,15 +50,10 @@
         {
           "type": "Any",
           "quantity": 3,
-          "mods": [
-            "Increased Waystone %"
-          ]
+          "mods": ["Increased Waystone %"]
         }
       ],
-      "tags": [
-        "citadel",
-        "boss"
-      ]
+      "tags": ["citadel", "boss"]
     },
     {
       "id": "breach-hive-colony",
@@ -84,16 +66,11 @@
         {
           "type": "Any",
           "quantity": 3,
-          "mods": [
-            "Increased Waystone %"
-          ]
+          "mods": ["Increased Waystone %"]
         }
       ],
       "warning": "Currently bugged — tablets sometimes cannot be used.",
-      "tags": [
-        "breach",
-        "boss"
-      ]
+      "tags": ["breach", "boss"]
     },
     {
       "id": "jade-isle-sacred-reservoir",
@@ -118,16 +95,12 @@
         {
           "type": "Additional Mods",
           "quantity": 4,
-          "mods": [
-            "Map has 2 additional mods"
-          ],
+          "mods": ["Map has 2 additional mods"],
           "tradeUrl": "https://www.pathofexile.com/trade2/search/poe2/Runes%20of%20Aldur/lrZ9QaQiV"
         }
       ],
       "notes": "Only the Waystone % chance stat on the waystone itself matters — dev confirmed via Steelmage.\nRun Visions + forest + 2mod first. Forest persists; run 3x 2mod next",
-      "tags": [
-        "boss"
-      ]
+      "tags": ["boss"]
     },
     {
       "id": "7396b8a6-db88-4b3e-97dd-2a0eec636b2e",
@@ -141,16 +114,12 @@
         {
           "type": "Irradiated",
           "quantity": 3,
-          "mods": [
-            "+2 mods"
-          ],
+          "mods": ["+2 mods"],
           "tradeUrl": "https://www.pathofexile.com/trade2/search/poe2/Runes%20of%20Aldur/BgvJJBGjc8"
         }
       ],
       "notes": "Sub for monster effect if too OP",
-      "tags": [
-        "expedition"
-      ]
+      "tags": ["expedition"]
     },
     {
       "id": "13179f6d-43ad-4f97-b45f-a0b49743294c",
@@ -165,18 +134,12 @@
         {
           "type": "Breach",
           "quantity": 3,
-          "mods": [
-            "Hiveblood Quant 55+"
-          ],
+          "mods": ["Hiveblood Quant 55+"],
           "tradeUrl": "https://www.pathofexile.com/trade2/search/poe2/Runes%20of%20Aldur/mk7MBylJU6"
         }
       ],
       "notes": "Spam Signet gifts from T16s",
-      "tags": [
-        "breach",
-        "travel",
-        "city"
-      ]
+      "tags": ["breach", "travel", "city"]
     },
     {
       "id": "6a305293-f612-47e7-a198-a0dd1fff73b2",
@@ -191,33 +154,21 @@
         {
           "type": "Irradiated",
           "quantity": 3,
-          "mods": [
-            "Waystone Drop %"
-          ]
+          "mods": ["Waystone Drop %"]
         },
         {
           "type": "Irradiated",
           "quantity": 3,
-          "mods": [
-            "monster rarity",
-            "item rarity"
-          ]
+          "mods": ["monster rarity", "item rarity"]
         },
         {
           "type": "Irradiated",
           "quantity": 1,
-          "mods": [
-            "additional modifiers",
-            "monster rarity",
-            "item rarity"
-          ]
+          "mods": ["additional modifiers", "monster rarity", "item rarity"]
         }
       ],
       "notes": "3 node types:\nTravel - 3x Irradiated tablet farm\nReg Expedition - T16 6mod rarity/monster rarity/effectiveness waystones\nAldur - same waystones, 2 additional modifier tablets, 1x prefix of monster/item rarity or effectiveness",
-      "tags": [
-        "expedition",
-        "travel"
-      ]
+      "tags": ["expedition", "travel"]
     }
   ]
 }

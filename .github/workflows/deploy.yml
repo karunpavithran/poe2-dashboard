@@ -1,0 +1,104 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  # Manual redeploys (e.g. after changing a secret) without an empty commit.
+  workflow_dispatch:
+
+# One deploy at a time; rapid pushes supersede in-flight runs.
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run eslint
+      - run: npm run prettier
+
+  build:
+    needs: checks
+    # Native arm64 (free on public repos) — the image builds for the Pi with no
+    # QEMU emulation, and better-sqlite3/esbuild use their arm64 prebuilds.
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          # latest moves with main; the sha tag pins every deploy for rollback.
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=sha-
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Ephemeral tailnet node; the Tailscale ACL allows tag:ci → Pi on port 22.
+      - uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PI_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          echo "Host pi
+            HostName ${{ secrets.PI_HOST }}
+            User ${{ secrets.PI_USER }}
+            IdentityFile ~/.ssh/id_deploy
+            StrictHostKeyChecking accept-new" > ~/.ssh/config
+      - name: Ship compose file
+        run: |
+          ssh pi "mkdir -p ~/poe2-dashboard"
+          scp docker-compose.pi.yml pi:poe2-dashboard/docker-compose.yml
+      - name: Pull and restart
+        run: |
+          ssh pi "cd ~/poe2-dashboard \
+            && docker compose pull --quiet \
+            && docker compose up -d \
+            && docker image prune -f"
+      - name: Health check
+        # The container migrates + seeds on boot; give it a few tries.
+        run: |
+          for i in $(seq 1 10); do
+            if ssh pi "curl -fsS http://127.0.0.1:3000/api/health"; then
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "app did not become healthy" >&2
+          exit 1

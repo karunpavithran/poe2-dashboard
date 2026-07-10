@@ -1,0 +1,19 @@
+# Deploy compose for the Raspberry Pi — shipped to the Pi by the deploy
+# workflow on every run (as ~/poe2-dashboard/docker-compose.yml), so changes
+# here are repo-driven. Runs the GHCR image built by CI; the local
+# docker-compose.yml (build: .) stays for dev verification.
+#
+# Rollback: IMAGE_TAG=sha-<commit> docker compose up -d
+services:
+  poe2-dashboard:
+    image: ghcr.io/karunpavithran/poe2-dashboard:${IMAGE_TAG:-latest}
+    ports:
+      - '3000:3000'
+    # Twitch credentials etc. — lives only on the Pi, next to this file.
+    env_file: .env
+    volumes:
+      - poe2-data:/data
+    restart: unless-stopped
+
+volumes:
+  poe2-data:

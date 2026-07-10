@@ -32,32 +32,26 @@ export const Combobox = ({
   // Filter suggestions against the current text; an empty field shows them all.
   const [inputItems, setInputItems] = useState<readonly string[]>(options)
 
-  const {
-    isOpen,
-    getMenuProps,
-    getInputProps,
-    getItemProps,
-    highlightedIndex,
-    openMenu,
-  } = useCombobox({
-    items: [...inputItems],
-    // Controlled text: the field value is whatever is typed, list or not.
-    inputValue: value,
-    onInputValueChange: ({ inputValue }) => {
-      const next = inputValue ?? ''
-      onChange(next)
-      const needle = next.toLowerCase()
-      setInputItems(options.filter(option => option.toLowerCase().includes(needle)))
-    },
-    onSelectedItemChange: ({ selectedItem }) => {
-      if (selectedItem != null) onChange(selectedItem)
-    },
-    // Clicking the input toggles the menu by default; combined with our
-    // open-on-focus that means a fresh click opens (focus) then instantly
-    // closes (click toggle). Force a click to always open instead.
-    stateReducer: (_state, { type, changes }) =>
-      type === useCombobox.stateChangeTypes.InputClick ? { ...changes, isOpen: true } : changes,
-  })
+  const { isOpen, getMenuProps, getInputProps, getItemProps, highlightedIndex, openMenu } =
+    useCombobox({
+      items: [...inputItems],
+      // Controlled text: the field value is whatever is typed, list or not.
+      inputValue: value,
+      onInputValueChange: ({ inputValue }) => {
+        const next = inputValue ?? ''
+        onChange(next)
+        const needle = next.toLowerCase()
+        setInputItems(options.filter(option => option.toLowerCase().includes(needle)))
+      },
+      onSelectedItemChange: ({ selectedItem }) => {
+        if (selectedItem != null) onChange(selectedItem)
+      },
+      // Clicking the input toggles the menu by default; combined with our
+      // open-on-focus that means a fresh click opens (focus) then instantly
+      // closes (click toggle). Force a click to always open instead.
+      stateReducer: (_state, { type, changes }) =>
+        type === useCombobox.stateChangeTypes.InputClick ? { ...changes, isOpen: true } : changes,
+    })
 
   return (
     <div className="relative">
