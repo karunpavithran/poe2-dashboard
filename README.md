@@ -1,7 +1,8 @@
 # poe2-dashboard
 
 Finds triangular arbitrage opportunities in Path of Exile 2's in-game currency
-exchange using poe.ninja data. Informational only — trades are executed
+exchange using poe.ninja data, plus an atlas-strategy tracker, build trends,
+and a tagged Twitch stream list. Informational only — trades are executed
 manually in-game.
 
 ## Architecture
@@ -25,7 +26,7 @@ poe.ninja          server (poller)            │  the boundary          client 
 ────────────       ───────────────            │  ────────────          ────────────────────         ─────
 economy +      →   rate-limited fan-out   →   │  GET /api/arbitrages →  deriveEconomy (cached):   →  Exchanges
 builds feed        normalize to edges         │  edges + value/icon/     buildGraph                  (arbitrage,
-                   persist snapshot           │  hub maps, gzipped       findTriangularArbitrages     rates,
+                   persist snapshot to SQLite │  hub maps, gzipped       findTriangularArbitrages     rates,
                    serve last-good on error   │                          computeBestExchange          explorer)
                    skip-if-running guard      │                          computeCurrencyCategories
 ```
@@ -43,14 +44,34 @@ cycles can route across them.
 - `packages/shared` — framework-free domain core (graph + arbitrage math) and
   the Zod request/response contracts validated on both ends; one runtime dep
   (`zod`), unit-tested with Vitest
-- `server` — Fastify (+ `@fastify/compress`); polls poe.ninja, normalizes to
-  edges, serves the snapshot. `fetch-extras` for rate-limit/retry, `pbf` for
+- `server` — Fastify (+ `@fastify/compress`, `@fastify/static` for the built
+  SPA); polls poe.ninja, normalizes to edges, serves the snapshot, and hosts
+  the atlas CRUD API. `fetch-extras` for rate-limit/retry, `pbf` for
   schema-less protobuf decode of the builds feed, `@anthropic-ai/sdk`
   (Claude Haiku 4.5) to tag Twitch stream titles
 - `client` — React 19 + Vite SPA; TanStack Query (the derivation runs in its
   transform, so the cache doubles as the derived-view store) + Table,
   Radix/shadcn/Tailwind v4, react-router; talks to the backend via the Vite
-  dev proxy
+  dev proxy. Widgets: arbitrage, exchanges, atlas, trends, streams
+
+Server features live in vertical slices (`server/src/slices/<feature>/`): each
+slice owns its Drizzle schema, DTO mappers, service, router, and `dbFunctions/`
+(one file per query — the only place SQL is issued; services compose them
+inside `db.transaction`).
+
+### Persistence
+
+SQLite via `better-sqlite3` + Drizzle (WAL, foreign keys on; migrations in
+`server/drizzle/` are applied at boot — the single-container deploy has no
+separate migrate step). Two slices share the one DB file:
+
+- **economy** — a restart cache, deliberately not history: each poll upserts
+  ONE snapshot row per league (plus child edge/currency rows), so the server
+  can serve last-good data immediately after a restart. Trend-over-time is
+  poe.ninja's job.
+- **atlas** — user-authored atlas strategies (normalized into strategy /
+  tablet / tag tables) behind `GET/POST/PUT/DELETE /api/atlas`. Seeded
+  idempotently by `server/scripts/seed-atlas.ts` when the table is empty.
 
 ## Setup
 
@@ -61,12 +82,17 @@ npm run dev:server
 npm run dev:client   # separate terminal; opens on http://localhost:5173
 ```
 
+The dev DB is created automatically at `server/data/poe2-dashboard.db`
+(gitignored). Optional: `npm run db:seed -w server` loads the sample atlas
+strategies and an economy snapshot; `npm run db:generate -w server` emits a
+migration after a schema change.
+
 ## Data source
 
 Two verified endpoints (June 2026), base
 `https://poe.ninja/poe2/api/economy/exchange/current`:
 
-```
+```text
 GET /overview?league=<league>&type=Currency
 GET /details?league=<league>&type=Currency&id=<detailsId>
 ```
@@ -88,14 +114,35 @@ opportunities.
 
 ## Environment variables (server)
 
-| Variable           | Default          | Purpose                                |
-| ------------------ | ---------------- | -------------------------------------- |
-| `LEAGUE`           | `Runes of Aldur` | poe.ninja league name (case-sensitive) |
-| `POLL_INTERVAL_MS` | `3600000`        | poe.ninja poll cadence                 |
-| `PORT`             | `3000`           | backend port                           |
+| Variable                                    | Default                         | Purpose                                            |
+| ------------------------------------------- | ------------------------------- | -------------------------------------------------- |
+| `LEAGUE`                                    | `Runes of Aldur`                | poe.ninja league name (case-sensitive)             |
+| `POLL_INTERVAL_MS`                          | `3600000`                       | poe.ninja poll cadence                             |
+| `PORT`                                      | `3000`                          | backend port                                       |
+| `HOST`                                      | `127.0.0.1`                     | bind address (Docker image sets `0.0.0.0`)         |
+| `DB_PATH`                                   | `server/data/poe2-dashboard.db` | SQLite file (Docker image sets the `/data` volume) |
+| `CLIENT_DIST`                               | unset                           | if set, serve the built SPA from this dir          |
+| `TWITCH_CLIENT_ID` / `TWITCH_CLIENT_SECRET` | unset                           | enables the streams widget                         |
+| `ANTHROPIC_API_KEY`                         | unset                           | enables Claude tagging of stream titles            |
+
+Dev reads them from a gitignored `.env` at the repo root
+(`node --env-file`); the Pi keeps its own `.env` next to the compose file.
+
+## Deployment
+
+Single container (multi-stage `Dockerfile`, Debian-slim so better-sqlite3's
+arm64 prebuilds work on a Raspberry Pi): builds the SPA, then runs the Fastify
+server, which serves both `/api` and the static client, with the SQLite file
+on a `/data` volume. `docker compose up` builds and runs it locally.
+
+Pushes to `main` trigger `.github/workflows/deploy.yml`: checks (typecheck,
+tests, lint, format) → native-arm64 image build pushed to GHCR (`latest` +
+`sha-<commit>` for rollback) → SSH to the Pi over an ephemeral Tailscale node,
+ship `docker-compose.pi.yml`, `docker compose pull && up -d`, health-check
+`/api/health`. Rollback on the Pi:
+`IMAGE_TAG=sha-<commit> docker compose up -d`.
 
 ## Later
 
 - Electron container: main process spawns the server, renderer loads the built
   SPA — client already only talks to localhost-relative `/api`.
-- SQLite (`better-sqlite3`) behind the poller if opportunity history is wanted.
