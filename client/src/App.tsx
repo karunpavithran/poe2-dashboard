@@ -17,6 +17,7 @@ import { ArbitrageProvider } from './widgets/arbitrage/context.js'
 import { AtlasWidget } from './widgets/atlas/AtlasWidget.js'
 import { ExchangesWidget } from './widgets/exchanges/ExchangesWidget.js'
 import { ExplorerTab } from './widgets/exchanges/ExplorerTab.js'
+import { RollsWidget } from './widgets/rolls/RollsWidget.js'
 import { TrendsWidget } from './widgets/trends/TrendsWidget.js'
 
 const WidgetSkeleton = () => (
@@ -78,6 +79,7 @@ export const App = () => (
       {/* Back-compat: the widget used to live at /arbitrage. */}
       <Route path="arbitrage" element={<RedirectPreservingQuery to="/exchanges" />} />
       <Route path="trends" element={<TrendsWidget />} />
+      <Route path="rolls" element={<RollsWidget />} />
       <Route path="atlas" element={<AtlasWidget />} />
       <Route path="*" element={<Navigate to="/exchanges" replace />} />
     </Route>

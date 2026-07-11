@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Map, TrendingUp } from 'lucide-react'
+import { ArrowLeftRight, Map, Percent, TrendingUp } from 'lucide-react'
 import { useRef } from 'react'
 import { Link, useLocation } from 'react-router'
 
@@ -14,6 +14,7 @@ const NAV_ITEMS: NavItem[] = [
   { section: 'exchanges', path: '/exchanges', label: 'Exchanges', Icon: ArrowLeftRight },
   { section: 'trends', path: '/trends', label: 'Meta Trends', Icon: TrendingUp },
   { section: 'atlas', path: '/atlas', label: 'Atlas Strategies', Icon: Map },
+  { section: 'rolls', path: '/rolls', label: 'Item Rolls', Icon: Percent },
 ]
 
 /** First path segment, e.g. "/atlas/abc" -> "atlas". */
