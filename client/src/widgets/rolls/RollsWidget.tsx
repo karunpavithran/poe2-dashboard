@@ -2,10 +2,11 @@ import type { ItemMod, ItemRoll } from '@poe2-dashboard/shared'
 import {
   combinedChanceToBeat,
   cumulativePercentile,
+  invertRoll,
   parseItemText,
   rollPercentile,
 } from '@poe2-dashboard/shared'
-import { Lock } from 'lucide-react'
+import { ArrowUpDown, Lock } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import { SectionLabel } from '@/components/common/SectionLabel'
@@ -43,11 +44,15 @@ type RollChipProps = {
   roll: ItemRoll
   /** null = fractured, not toggleable */
   counted: boolean | null
+  inverted: boolean
   onToggle: () => void
+  onInvert: () => void
 }
 
-const RollChip = ({ roll, counted, onToggle }: RollChipProps) => {
-  const percentile = rollPercentile(roll)
+const RollChip = ({ roll, counted, inverted, onToggle, onInvert }: RollChipProps) => {
+  // An inverted roll is scored toward its minimum; the mirror helper keeps
+  // every percentile/odds function oblivious to direction.
+  const percentile = rollPercentile(inverted ? invertRoll(roll) : roll)
   const fixed = roll.min === roll.max
   const body = (
     <>
@@ -70,21 +75,46 @@ const RollChip = ({ roll, counted, onToggle }: RollChipProps) => {
       </span>
     )
   }
+  // One bordered pill; the toggle and invert buttons are borderless segments
+  // inside it, split by a hairline, so the selected styling wraps both evenly.
   return (
-    <button
-      type="button"
-      aria-pressed={counted}
-      onClick={onToggle}
-      title={counted ? 'Counted — click to exclude' : 'Excluded — click to count'}
+    <span
       className={cn(
-        'inline-flex items-center gap-2 rounded-full border px-2.5 py-0.5 text-xs select-none transition-colors',
+        'inline-flex items-stretch overflow-hidden rounded-full border text-xs transition-colors',
         counted
           ? 'border-indigo-500 bg-indigo-950/60 shadow-[0_0_0_1px_theme(colors.indigo.500)]'
           : 'border-border bg-secondary opacity-50 hover:border-primary/50 hover:opacity-80',
       )}
     >
-      {body}
-    </button>
+      <button
+        type="button"
+        aria-pressed={counted}
+        onClick={onToggle}
+        title={counted ? 'Counted — click to exclude' : 'Excluded — click to count'}
+        className="inline-flex items-center gap-2 px-2.5 py-0.5 select-none"
+      >
+        {body}
+      </button>
+      <button
+        type="button"
+        aria-pressed={inverted}
+        onClick={onInvert}
+        title={
+          inverted
+            ? 'Minimising — lower rolls score higher; click to prefer high rolls'
+            : 'Maximising — click to prefer low rolls instead'
+        }
+        className={cn(
+          'inline-flex items-center border-l px-1.5 transition-colors',
+          counted ? 'border-indigo-500/50' : 'border-border',
+          inverted
+            ? 'bg-amber-950/60 text-amber-400'
+            : 'text-muted-foreground hover:text-foreground',
+        )}
+      >
+        <ArrowUpDown size={12} />
+      </button>
+    </span>
   )
 }
 
@@ -92,10 +122,12 @@ type ModBlockProps = {
   mod: ItemMod
   modIndex: number
   isExcluded: (key: string) => boolean
+  isInverted: (key: string) => boolean
   onToggle: (key: string) => void
+  onInvert: (key: string) => void
 }
 
-const ModBlock = ({ mod, modIndex, isExcluded, onToggle }: ModBlockProps) => (
+const ModBlock = ({ mod, modIndex, isExcluded, isInverted, onToggle, onInvert }: ModBlockProps) => (
   <div className={cn('rounded-lg border border-border p-3', mod.fractured && 'opacity-70')}>
     <div className="flex flex-wrap items-center gap-2 pb-2 text-xs text-muted-foreground">
       <span className="font-medium text-foreground">{mod.name ?? mod.header}</span>
@@ -118,7 +150,9 @@ const ModBlock = ({ mod, modIndex, isExcluded, onToggle }: ModBlockProps) => (
                   key={rollIndex}
                   roll={roll}
                   counted={mod.fractured ? null : !isExcluded(key)}
+                  inverted={isInverted(key)}
                   onToggle={() => onToggle(key)}
+                  onInvert={() => onInvert(key)}
                 />
               )
             })}
@@ -131,25 +165,30 @@ const ModBlock = ({ mod, modIndex, isExcluded, onToggle }: ModBlockProps) => (
 
 export const RollsWidget = () => {
   const [text, setText] = useState('')
-  // Rolls are counted by default; we track the exclusions so a fresh paste
-  // starts with everything on. Keys are positional, so they'd silently point
-  // at the wrong rolls on a different item — handlePaste clears them.
+  // Rolls are counted (and maximised) by default; we track the exceptions so
+  // a fresh paste starts with everything on. Keys are positional, so they'd
+  // silently point at the wrong rolls on a different item — handlePaste
+  // clears them.
   const [excluded, setExcluded] = useState<Set<string>>(() => new Set())
+  const [inverted, setInverted] = useState<Set<string>>(() => new Set())
 
   const item = useMemo(() => (text.trim() ? parseItemText(text) : null), [text])
 
   const handlePaste = (next: string) => {
     setText(next)
     setExcluded(new Set())
+    setInverted(new Set())
   }
 
-  const toggle = (key: string) =>
-    setExcluded(current => {
+  const toggleIn = (setSet: React.Dispatch<React.SetStateAction<Set<string>>>) => (key: string) =>
+    setSet(current => {
       const next = new Set(current)
       if (next.has(key)) next.delete(key)
       else next.add(key)
       return next
     })
+  const toggle = toggleIn(setExcluded)
+  const toggleInverted = toggleIn(setInverted)
 
   const divinableRolls = useMemo(() => {
     if (!item) return []
@@ -167,7 +206,7 @@ export const RollsWidget = () => {
 
   const countedRolls = divinableRolls
     .filter(entry => !excluded.has(entry.key))
-    .map(entry => entry.roll)
+    .map(entry => (inverted.has(entry.key) ? invertRoll(entry.roll) : entry.roll))
   const percentile = cumulativePercentile(countedRolls)
   // Divines are geometric trials: on average 1/p orbs until one strictly beats.
   const beat = combinedChanceToBeat(countedRolls)
@@ -188,7 +227,9 @@ export const RollsWidget = () => {
         </div>
 
         {item && (
-          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto">
+          <div className="flex min-h-0 flex-1 flex-col gap-4">
+            {/* Outside the scroll container so the stats stay in sight while
+                scrolling the mod list to toggle rolls. */}
             <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
               <span className="text-sm font-medium">
                 {item.name ?? item.baseType ?? 'Unknown item'}
@@ -236,14 +277,16 @@ export const RollsWidget = () => {
                 {'{ Prefix Modifier … }'} headers and roll ranges.
               </p>
             ) : (
-              <div className="flex flex-col gap-2">
+              <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-auto">
                 {item.mods.map((mod, modIndex) => (
                   <ModBlock
                     key={modIndex}
                     mod={mod}
                     modIndex={modIndex}
                     isExcluded={key => excluded.has(key)}
+                    isInverted={key => inverted.has(key)}
                     onToggle={toggle}
+                    onInvert={toggleInverted}
                   />
                 ))}
               </div>

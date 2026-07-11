@@ -49,16 +49,35 @@ export type ParsedItem = {
 
 const SEPARATOR = /^-{4,}$/
 const MOD_HEADER = /^\{\s*(.+?)\s*\}$/
-// `98(92-100)` and `-15(-20--11)` both parse: `-?` on each bound absorbs the
-// extra dash negative ranges print with.
-const ROLL = /(-?\d+(?:\.\d+)?)\((-?\d+(?:\.\d+)?)-(-?\d+(?:\.\d+)?)\)/g
+// `98(92-100)`, `-15(-20--11)`, and unique-item shapes like `+70(-200-+400)`
+// all parse: `[+-]?` on each bound absorbs the sign the game prints, and the
+// bare `-` between them is the range separator.
+const ROLL = /(-?\d+(?:\.\d+)?)\(([+-]?\d+(?:\.\d+)?)-([+-]?\d+(?:\.\d+)?)\)/g
+
+// The game words a stat for the sign of its current roll — a negative
+// "increased" roll prints as positive "reduced" (and "more" as "less"), with
+// the range bounds sign-flipped the same way (`9(20--20)% reduced Rarity` is
+// canonically -9 in -20..+20 increased). Detecting the wording lets us undo
+// the flip so every roll lives on the one axis where higher is more.
+const INVERTED_WORDING = /\b(reduced|less)\b/
 
 const parseModLine = (text: string): ItemModLine => {
+  const sign = INVERTED_WORDING.test(text) ? -1 : 1
   const rolls: ItemRoll[] = []
   for (const match of text.matchAll(ROLL)) {
-    rolls.push({ value: Number(match[1]), min: Number(match[2]), max: Number(match[3]) })
+    const first = sign * Number(match[2])
+    const second = sign * Number(match[3])
+    rolls.push({
+      value: sign * Number(match[1]),
+      min: Math.min(first, second),
+      max: Math.max(first, second),
+    })
   }
-  return { text: text.replace(ROLL, '$1'), rolls }
+  let display = text.replace(ROLL, (_, value: string) => String(sign * Number(value)))
+  if (sign === -1 && rolls.length > 0) {
+    display = display.replace(INVERTED_WORDING, word => (word === 'reduced' ? 'increased' : 'more'))
+  }
+  return { text: display, rolls }
 }
 
 export const parseItemText = (text: string): ParsedItem => {
@@ -126,6 +145,18 @@ export const parseItemText = (text: string): ParsedItem => {
 
 /** Number of integer values a Divine Orb can land on for this roll. */
 export const rollOutcomes = (roll: ItemRoll): number => roll.max - roll.min + 1
+
+/**
+ * Views a roll as if lower were better — for mods you want minimised (added
+ * requirements, negative implicits, …). Mirroring value and bounds about zero
+ * lets every scoring function below measure toward the minimum unchanged.
+ * Self-inverse: applying it twice gives back the original roll.
+ */
+export const invertRoll = (roll: ItemRoll): ItemRoll => ({
+  value: -roll.value,
+  min: -roll.max,
+  max: -roll.min,
+})
 
 /**
  * Share of possible divine outcomes at or below the current value, in [0, 1].

@@ -5,6 +5,7 @@ import {
   combinedChanceToBeat,
   combinedChanceToMatchOrBeat,
   cumulativePercentile,
+  invertRoll,
   parseItemText,
   rollPercentile,
 } from '../src/itemRolls.js'
@@ -102,6 +103,50 @@ Adds 5(3-6) to 9(8-12) Lightning Damage`)
     expect(parsed.baseType).toBe('Sparking Wand')
   })
 
+  it('handles unique-item ranges: signed bounds and high-to-low order', () => {
+    const parsed = parseItemText(`Item Class: Body Armours
+Rarity: Unique
+Loreweave
+Ornate Ringmail
+--------
+{ Unique Modifier — Attack }
++70(-200-+400) to Accuracy Rating
+{ Unique Modifier — Mana }
++31(-10-+40) to maximum Mana
+{ Unique Modifier }
+9(20--20)% reduced Rarity of Items found`)
+    expect(parsed.mods.map(mod => mod.lines[0])).toEqual([
+      { text: '+70 to Accuracy Rating', rolls: [{ value: 70, min: -200, max: 400 }] },
+      { text: '+31 to maximum Mana', rolls: [{ value: 31, min: -10, max: 40 }] },
+      // "9% reduced" is a negative "increased" roll: value and bounds are
+      // sign-flipped back onto the canonical axis and the wording follows.
+      { text: '-9% increased Rarity of Items found', rolls: [{ value: -9, min: -20, max: 20 }] },
+    ])
+    // Headers without a quoted name or tier still parse.
+    expect(parsed.mods[0].name).toBeNull()
+    expect(parsed.mods[0].tier).toBeNull()
+  })
+
+  it('canonicalises wholly reduced/less mods onto the increased/more axis', () => {
+    const parsed = parseItemText(`Item Class: Boots
+Rarity: Rare
+Test
+Boots
+--------
+{ Suffix Modifier "of Testing" (Tier: 1) }
+15(10-20)% reduced Mana Cost of Skills
+{ Suffix Modifier "of Slowing" (Tier: 1) }
+5(3-8)% less Projectile Speed
+{ Suffix Modifier "of Stasis" (Tier: 1) }
+Projectiles are reduced to a standstill`)
+    expect(parsed.mods.map(mod => mod.lines[0])).toEqual([
+      { text: '-15% increased Mana Cost of Skills', rolls: [{ value: -15, min: -20, max: -10 }] },
+      { text: '-5% more Projectile Speed', rolls: [{ value: -5, min: -8, max: -3 }] },
+      // No rolls on the line — the wording is left as printed.
+      { text: 'Projectiles are reduced to a standstill', rolls: [] },
+    ])
+  })
+
   it('handles negative ranges with their doubled dashes', () => {
     const parsed = parseItemText(`Item Class: Rings
 Rarity: Rare
@@ -153,6 +198,14 @@ describe('roll math', () => {
     expect(cumulativePercentile([fixed, roll])).toBeCloseTo(rollPercentile(roll))
     expect(cumulativePercentile([fixed])).toBe(1)
     expect(cumulativePercentile([])).toBe(1)
+  })
+
+  it('inverting a roll measures it toward the minimum', () => {
+    const roll = { value: 98, min: 92, max: 100 }
+    // 98 is 7th of 9 counting up, so 3rd of 9 counting down.
+    expect(rollPercentile(invertRoll(roll))).toBeCloseTo(3 / 9)
+    expect(chanceToMatchOrBeat(invertRoll(roll))).toBeCloseTo(7 / 9)
+    expect(invertRoll(invertRoll(roll))).toEqual(roll)
   })
 
   it('chance to strictly beat excludes the exact-reproduction outcome', () => {
