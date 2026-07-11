@@ -147,6 +147,19 @@ export const chanceToMatchOrBeat = (roll: ItemRoll): number =>
 export const combinedChanceToMatchOrBeat = (rolls: ItemRoll[]): number =>
   rolls.reduce((product, roll) => product * chanceToMatchOrBeat(roll), 1)
 
+/**
+ * Chance one Divine Orb strictly beats the given rolls: at or above the
+ * current value on every roll, and above it on at least one. That's the
+ * match-or-beat chance minus the single outcome that reproduces every roll
+ * exactly. Zero when every roll is already at its maximum.
+ *
+ * Divine rerolls are independent trials, so the expected number of orbs to
+ * see a strictly better outcome is 1 over this chance (geometric mean).
+ */
+export const combinedChanceToBeat = (rolls: ItemRoll[]): number =>
+  combinedChanceToMatchOrBeat(rolls) -
+  rolls.reduce((product, roll) => product / rollOutcomes(roll), 1)
+
 // Resolution for a roll's position within its range in cumulativePercentile.
 // Positions are quantised to thousandths of the range so the convolution runs
 // over small integer sums; the binning error is far below display precision.

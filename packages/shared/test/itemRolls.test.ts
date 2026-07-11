@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   chanceToMatchOrBeat,
+  combinedChanceToBeat,
   combinedChanceToMatchOrBeat,
   cumulativePercentile,
   parseItemText,
@@ -152,6 +153,22 @@ describe('roll math', () => {
     expect(cumulativePercentile([fixed, roll])).toBeCloseTo(rollPercentile(roll))
     expect(cumulativePercentile([fixed])).toBe(1)
     expect(cumulativePercentile([])).toBe(1)
+  })
+
+  it('chance to strictly beat excludes the exact-reproduction outcome', () => {
+    // 98 in 92-100: match-or-beat is 3/9; only 99 and 100 strictly beat it.
+    expect(combinedChanceToBeat([{ value: 98, min: 92, max: 100 }])).toBeCloseTo(2 / 9)
+    // Two coin-flip rolls, one at max, one at min: beat = P(both ≥) − P(both
+    // exact) = (1 × ½) − ¼.
+    expect(
+      combinedChanceToBeat([
+        { value: 2, min: 1, max: 2 },
+        { value: 1, min: 1, max: 2 },
+      ]),
+    ).toBeCloseTo(1 / 4)
+    // All rolls at their max can never be beaten.
+    expect(combinedChanceToBeat([{ value: 100, min: 92, max: 100 }])).toBeCloseTo(0)
+    expect(combinedChanceToBeat([])).toBe(0)
   })
 
   it('combined chance multiplies independent rolls', () => {

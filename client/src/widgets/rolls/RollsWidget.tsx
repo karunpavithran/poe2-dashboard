@@ -1,6 +1,6 @@
 import type { ItemMod, ItemRoll } from '@poe2-dashboard/shared'
 import {
-  combinedChanceToMatchOrBeat,
+  combinedChanceToBeat,
   cumulativePercentile,
   parseItemText,
   rollPercentile,
@@ -168,10 +168,10 @@ export const RollsWidget = () => {
   const countedRolls = divinableRolls
     .filter(entry => !excluded.has(entry.key))
     .map(entry => entry.roll)
-  const combined = combinedChanceToMatchOrBeat(countedRolls)
   const percentile = cumulativePercentile(countedRolls)
-  // A run of divines is a geometric trial: on average 1/p orbs to hit this.
-  const oneIn = combined > 0 ? Math.round(1 / combined) : null
+  // Divines are geometric trials: on average 1/p orbs until one strictly beats.
+  const beat = combinedChanceToBeat(countedRolls)
+  const expectedToBeat = beat > 0 ? Math.round(1 / beat) : null
 
   return (
     <Card className="h-full">
@@ -211,13 +211,15 @@ export const RollsWidget = () => {
                     </span>
                   </span>
                   <span className="text-sm text-muted-foreground">
-                    A Divine Orb matches or beats the {countedRolls.length} counted{' '}
-                    {countedRolls.length === 1 ? 'roll' : 'rolls'} with chance{' '}
-                    <span className={cn('font-medium', percentileTone(1 - combined))}>
-                      {formatPercent(combined)}
-                    </span>
-                    {oneIn !== null && oneIn > 1 && (
-                      <span className="tabular-nums"> (~1 in {oneIn.toLocaleString()})</span>
+                    {expectedToBeat !== null ? (
+                      <span title="Average orbs until a strictly better outcome: at or above every counted roll, above at least one">
+                        <span className="font-medium text-foreground tabular-nums">
+                          {expectedToBeat.toLocaleString()}
+                        </span>{' '}
+                        divines to beat current roll
+                      </span>
+                    ) : (
+                      <span>can&apos;t be beaten — every counted roll is at its max</span>
                     )}
                   </span>
                 </>
