@@ -38,7 +38,8 @@ const namedQuery = <TName extends Resource, TData>(
 type ResourceConfig<TName extends Resource, TParams, TOut> = {
   name: TName
   fetcher: (params: TParams) => Promise<ResourceDataMap[TName]>
-  refetchInterval?: number
+  /** `false` disables background polling entirely — the resource only refetches on demand. */
+  refetchInterval?: number | false
   transform?: (raw: ResourceDataMap[TName]) => TOut
   keepPreviousData?: boolean
 }
@@ -64,7 +65,9 @@ const createResourceQuery = <TName extends Resource, TParams = void, TOut = Reso
           // server's next snapshot, independent of how often the server polls.
           const interval = config.refetchInterval ?? DEFAULT_REFETCH_INTERVAL
           const start = performance.now()
-          console.log(`[query:${config.name}] fetching (refetchInterval=${interval}ms)`)
+          console.log(
+            `[query:${config.name}] fetching (refetchInterval=${interval === false ? 'off' : `${interval}ms`})`,
+          )
           try {
             const raw = await config.fetcher(params)
             console.log(

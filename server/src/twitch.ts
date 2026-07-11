@@ -1,16 +1,15 @@
 import type { StreamsResponse, TwitchStream } from '@poe2-dashboard/shared'
 import { z } from 'zod'
 
+import { loadTwitchSnapshot, saveTwitchSnapshot } from './slices/twitch/twitch.service.js'
 import { tagStreams } from './twitchTags.js'
-
-const POLL_INTERVAL_MS = 30 * 60 * 1000
 
 interface AppToken {
   accessToken: string
   expiresAt: number
 }
 
-export type TwitchPollerState = {
+export type TwitchState = {
   streams: TwitchStream[]
   fetchedAt: number | null
   lastError: string | null
@@ -84,21 +83,48 @@ const fetchTopStreams = async (
   }))
 }
 
-export type TwitchPollerOptions = {
+export type TwitchFetcherOptions = {
   clientId: string
   clientSecret: string
 }
 
-export const createTwitchPoller = (options: TwitchPollerOptions) => {
-  const state: TwitchPollerState = {
+export type TwitchFetcher = {
+  state: TwitchState
+  /**
+   * Fetch (and tag) streams only if no snapshot exists at all — neither in
+   * memory nor restored from the DB. Once a snapshot exists it is served
+   * indefinitely; only `refresh` replaces it. So Twitch and the Claude tagging
+   * call run at most once ever per explicit user refresh, and never before a
+   * client actually requests the data. Concurrent callers share one in-flight
+   * fetch.
+   */
+  ensureFresh: () => Promise<void>
+  /** Force a new Twitch fetch + tagging pass, replacing the cached snapshot. */
+  refresh: () => Promise<void>
+}
+
+export const createTwitchFetcher = (options: TwitchFetcherOptions): TwitchFetcher => {
+  const state: TwitchState = {
     streams: [],
     fetchedAt: null,
     lastError: null,
   }
 
+  // Restore the last persisted snapshot so restarts don't re-hit Twitch/Claude.
+  const cached = loadTwitchSnapshot()
+  if (cached) {
+    state.streams = cached.streams
+    state.fetchedAt = cached.fetchedAt
+    console.log(
+      `[twitch] restored ${cached.streams.length} streams from the last snapshot ` +
+        `(fetchedAt=${new Date(cached.fetchedAt).toISOString()})`,
+    )
+  }
+
   if (!options.clientId || !options.clientSecret) {
     state.lastError = 'TWITCH_CLIENT_ID / TWITCH_CLIENT_SECRET not configured'
-    return { state, start: () => {}, stop: () => {} }
+    const noop = () => Promise.resolve()
+    return { state, ensureFresh: noop, refresh: noop }
   }
 
   let token: AppToken | null = null
@@ -111,7 +137,7 @@ export const createTwitchPoller = (options: TwitchPollerOptions) => {
     return token.accessToken
   }
 
-  const pollOnce = async (): Promise<void> => {
+  const fetchOnce = async (): Promise<void> => {
     try {
       const accessToken = await getToken()
       if (!gameId) {
@@ -122,31 +148,36 @@ export const createTwitchPoller = (options: TwitchPollerOptions) => {
       state.streams = await tagStreams(raw)
       state.fetchedAt = Date.now()
       state.lastError = null
+      try {
+        saveTwitchSnapshot({ fetchedAt: state.fetchedAt, streams: state.streams })
+      } catch (err) {
+        // Persistence failing only costs the restart cache; keep serving from memory.
+        console.warn(
+          `[twitch] could not persist snapshot: ${err instanceof Error ? err.message : err}`,
+        )
+      }
     } catch (err) {
       state.lastError = err instanceof Error ? err.message : String(err)
-      console.error(`[twitch] poll failed: ${state.lastError}`)
+      console.error(`[twitch] fetch failed: ${state.lastError}`)
     }
   }
 
-  let timer: NodeJS.Timeout | null = null
+  let inFlight: Promise<void> | null = null
 
-  const scheduleTick = (): void => {
-    void pollOnce().then(() => {
-      timer = setTimeout(scheduleTick, POLL_INTERVAL_MS)
+  const refresh = (): Promise<void> => {
+    inFlight ??= fetchOnce().finally(() => {
+      inFlight = null
     })
+    return inFlight
   }
 
-  return {
-    state,
-    start: scheduleTick,
-    stop: () => {
-      if (timer) clearTimeout(timer)
-      timer = null
-    },
-  }
+  const ensureFresh = (): Promise<void> =>
+    state.fetchedAt === null ? refresh() : Promise.resolve()
+
+  return { state, ensureFresh, refresh }
 }
 
-export const toStreamsResponse = (state: TwitchPollerState): StreamsResponse => ({
+export const toStreamsResponse = (state: TwitchState): StreamsResponse => ({
   streams: state.streams,
   fetchedAt: state.fetchedAt,
   lastError: state.lastError,

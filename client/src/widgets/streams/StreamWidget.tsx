@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { useStreams } from '@/api.js'
+import { useRefreshStreams, useStreams } from '@/api.js'
 import { DataAge } from '@/components/common/DataAge.js'
 import { TagChip } from '@/components/common/TagChip.js'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -14,7 +14,8 @@ import {
 } from '@/components/ui/table'
 
 export const StreamWidget = () => {
-  const { streams, refetchStreams, isStreamsFetching } = useStreams()
+  const { streams, isStreamsFetching } = useStreams()
+  const refresh = useRefreshStreams()
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
 
   const { softcoreStreams, tags, fetchedAt, lastError } = streams
@@ -29,8 +30,8 @@ export const StreamWidget = () => {
         {fetchedAt && (
           <DataAge
             fetchedAt={fetchedAt}
-            onRefetch={refetchStreams}
-            isFetching={isStreamsFetching}
+            onRefetch={() => refresh.mutate()}
+            isFetching={refresh.isPending || isStreamsFetching}
           />
         )}
       </CardHeader>

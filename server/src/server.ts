@@ -5,13 +5,19 @@ import Fastify from 'fastify'
 
 import type { PollerState } from './poller.js'
 import { atlasRouter } from './slices/atlas/atlas.router.js'
-import type { TwitchPollerState } from './twitch.js'
+import type { TwitchFetcher } from './twitch.js'
 import { toStreamsResponse } from './twitch.js'
 
 export const createServer = async (
   state: PollerState,
   league: string,
-  twitchState: TwitchPollerState,
+  /**
+   * On-demand Twitch source: the stream routes call `ensureFresh()`, which only
+   * hits Twitch (and the Claude tagging call) if no snapshot exists yet — after
+   * that the cache is served indefinitely and POST /api/streams/refresh is the
+   * sole way to spend another upstream call.
+   */
+  twitch: TwitchFetcher,
   /**
    * Kicks a fresh economy poll for the on-demand refresh route. Fire-and-forget:
    * the poll takes minutes, so the route returns immediately and clients observe
@@ -68,19 +74,30 @@ export const createServer = async (
     reply.code(202).send({ isRefreshing: true })
   })
 
-  app.get('/api/streams', () => toStreamsResponse(twitchState))
+  app.get('/api/streams', async () => {
+    await twitch.ensureFresh()
+    return toStreamsResponse(twitch.state)
+  })
 
-  app.get(
-    '/api/build-trends',
-    (): BuildTrendsResponse => ({
-      streams: twitchState.streams,
-      fetchedAt: twitchState.fetchedAt,
-      lastError: twitchState.lastError,
+  // Explicit user-triggered refresh — the only path that replaces an existing
+  // snapshot. Awaited (unlike the arbitrage refresh) because a Twitch fetch +
+  // tagging pass is seconds, not minutes; the client refetches on success.
+  app.post('/api/streams/refresh', async () => {
+    await twitch.refresh()
+    return toStreamsResponse(twitch.state)
+  })
+
+  app.get('/api/build-trends', async (): Promise<BuildTrendsResponse> => {
+    await twitch.ensureFresh()
+    return {
+      streams: twitch.state.streams,
+      fetchedAt: twitch.state.fetchedAt,
+      lastError: twitch.state.lastError,
       ascendancies: state.ascendancyTrends,
       mainSkills: state.mainSkills,
       ninjaError: state.lastError,
-    }),
-  )
+    }
+  })
 
   await app.register(atlasRouter, { prefix: '/api/atlas' })
 

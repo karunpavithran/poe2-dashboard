@@ -27,9 +27,13 @@ export const fetchStreams = async () => {
   return StreamsResponseSchema.parse(await res.json())
 }
 
-export const { useResource: useStreams } = createResourceQuery({
+// Stream data is informational, not time-critical: the server caches its one
+// snapshot indefinitely, so no background polling — the data only changes when
+// the user explicitly refreshes (useRefreshStreams).
+export const { useResource: useStreams, queryKey: streamsQueryKey } = createResourceQuery({
   name: 'streams',
   fetcher: fetchStreams,
+  refetchInterval: false,
   transform: raw => ({
     ...raw,
     softcoreStreams: raw.streams.filter(isSoftcore),
@@ -43,15 +47,36 @@ export const fetchBuildTrends = async () => {
   return BuildTrendsResponseSchema.parse(await res.json())
 }
 
-export const { useResource: useBuildTrends } = createResourceQuery({
+export const { useResource: useBuildTrends, queryKey: buildTrendsQueryKey } = createResourceQuery({
   name: 'buildTrends',
   fetcher: fetchBuildTrends,
+  refetchInterval: false,
   transform: raw => ({
     ...raw,
     softcoreStreams: raw.streams.filter(isSoftcore),
     tags: extractTags(raw.streams),
   }),
 })
+
+// Force the server to replace its cached Twitch snapshot (the only path that
+// spends a Twitch + Claude tagging call), then refetch both resources built on
+// it. Awaits the server-side fetch, so isPending covers the whole refresh.
+export const requestStreamsRefresh = async (): Promise<void> => {
+  const res = await fetch('/api/streams/refresh', { method: 'POST' })
+  if (!res.ok) throw new Error(`Backend returned ${res.status}`)
+}
+
+export const useRefreshStreams = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: requestStreamsRefresh,
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: streamsQueryKey }),
+        queryClient.invalidateQueries({ queryKey: buildTrendsQueryKey }),
+      ]),
+  })
+}
 
 // The server ships the minimal economy source (edges + value/icon maps + hubs);
 // we fetch it once under a stable key and derive every view client-side. All

@@ -1,7 +1,7 @@
 import { runMigrations } from './db/client.js'
 import { createPoller } from './poller.js'
 import { createServer } from './server.js'
-import { createTwitchPoller } from './twitch.js'
+import { createTwitchFetcher } from './twitch.js'
 
 const league = process.env.LEAGUE ?? 'Runes of Aldur'
 const intervalMs = Number(process.env.POLL_INTERVAL_MS ?? 60 * 60 * 1000)
@@ -18,16 +18,18 @@ runMigrations()
 const poller = createPoller({ league, intervalMs })
 poller.start()
 
-const twitchPoller = createTwitchPoller({
+// Lazy: no Twitch (or Claude tagging) call happens here — the fetcher restores
+// the persisted snapshot and only hits upstream on the first-ever request or an
+// explicit POST /api/streams/refresh.
+const twitch = createTwitchFetcher({
   clientId: process.env.TWITCH_CLIENT_ID ?? '',
   clientSecret: process.env.TWITCH_CLIENT_SECRET ?? '',
 })
-twitchPoller.start()
 
 const app = await createServer(
   poller.state,
   league,
-  twitchPoller.state,
+  twitch,
   () => void poller.pollOnce(),
   clientDist,
 )

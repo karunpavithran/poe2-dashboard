@@ -8,6 +8,7 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 
 import * as atlasSchema from '../slices/atlas/atlas.schema.js'
 import * as economySchema from '../slices/economy/economy.schema.js'
+import * as twitchSchema from '../slices/twitch/twitch.schema.js'
 
 /**
  * DB file location: DB_PATH env (the Docker volume mount point on the Pi) or a
@@ -33,7 +34,9 @@ sqlite.pragma('foreign_keys = ON')
  * Schema-aware Drizzle client. Every slice's schema namespace is spread in so the
  * relational query API (`db.query.<table>`) is fully typed across slices.
  */
-export const db = drizzle(sqlite, { schema: { ...atlasSchema, ...economySchema } })
+export const db = drizzle(sqlite, {
+  schema: { ...atlasSchema, ...economySchema, ...twitchSchema },
+})
 
 /**
  * The transaction handle services pass down to db functions — every DB trip goes

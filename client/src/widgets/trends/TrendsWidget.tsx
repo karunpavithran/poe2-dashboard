@@ -1,7 +1,7 @@
 import { ArrowDown, ArrowUp, Minus } from 'lucide-react'
 import { useState } from 'react'
 
-import { useBuildTrends } from '@/api.js'
+import { useBuildTrends, useRefreshStreams } from '@/api.js'
 import { DataAge } from '@/components/common/DataAge.js'
 import { SectionLabel, sectionLabelClass } from '@/components/common/SectionLabel.js'
 import { TagChip } from '@/components/common/TagChip.js'
@@ -33,9 +33,9 @@ export const TrendsWidget = () => {
       ascendancies,
       mainSkills,
     },
-    refetchBuildTrends,
     isBuildTrendsFetching,
   } = useBuildTrends()
+  const refresh = useRefreshStreams()
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
 
   const displayedTags = selectedTag ? tags.filter(t => t.tag.toLowerCase() === selectedTag) : tags
@@ -54,8 +54,8 @@ export const TrendsWidget = () => {
         <CardTitle>Meta Trends</CardTitle>
         <DataAge
           fetchedAt={fetchedAt}
-          onRefetch={refetchBuildTrends}
-          isFetching={isBuildTrendsFetching}
+          onRefetch={() => refresh.mutate()}
+          isFetching={refresh.isPending || isBuildTrendsFetching}
         />
       </CardHeader>
       <CardContent className="flex-1 min-h-0 flex flex-col">
