@@ -38,8 +38,13 @@ const namedQuery = <TName extends Resource, TData>(
 type ResourceConfig<TName extends Resource, TParams, TOut> = {
   name: TName
   fetcher: (params: TParams) => Promise<ResourceDataMap[TName]>
-  /** `false` disables background polling entirely — the resource only refetches on demand. */
-  refetchInterval?: number | false
+  refetchInterval?: number
+  /**
+   * Manual resources fetch once and then only on explicit invalidation
+   * (`queryClient.invalidateQueries`): no interval polling, and never-stale
+   * data means the mount/window-focus/reconnect triggers don't refetch either.
+   */
+  isManual?: boolean
   transform?: (raw: ResourceDataMap[TName]) => TOut
   keepPreviousData?: boolean
 }
@@ -63,11 +68,11 @@ const createResourceQuery = <TName extends Resource, TParams = void, TOut = Reso
           // Logged so the actual fetch cadence is visible in the console: the
           // refetchInterval here is how long the client waits before pulling the
           // server's next snapshot, independent of how often the server polls.
-          const interval = config.refetchInterval ?? DEFAULT_REFETCH_INTERVAL
+          const interval = config.isManual
+            ? 'manual'
+            : `${config.refetchInterval ?? DEFAULT_REFETCH_INTERVAL}ms`
           const start = performance.now()
-          console.log(
-            `[query:${config.name}] fetching (refetchInterval=${interval === false ? 'off' : `${interval}ms`})`,
-          )
+          console.log(`[query:${config.name}] fetching (refetchInterval=${interval})`)
           try {
             const raw = await config.fetcher(params)
             console.log(
@@ -82,7 +87,10 @@ const createResourceQuery = <TName extends Resource, TParams = void, TOut = Reso
             throw err
           }
         },
-        refetchInterval: config.refetchInterval ?? DEFAULT_REFETCH_INTERVAL,
+        refetchInterval: config.isManual
+          ? false
+          : (config.refetchInterval ?? DEFAULT_REFETCH_INTERVAL),
+        staleTime: config.isManual ? Infinity : undefined,
         placeholderData: config.keepPreviousData ? keepPreviousData : undefined,
       }),
     )

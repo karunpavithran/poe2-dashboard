@@ -28,12 +28,12 @@ export const fetchStreams = async () => {
 }
 
 // Stream data is informational, not time-critical: the server caches its one
-// snapshot indefinitely, so no background polling — the data only changes when
-// the user explicitly refreshes (useRefreshStreams).
+// snapshot indefinitely, so the client fetches once and only refetches when the
+// user explicitly refreshes (useRefreshStreams).
 export const { useResource: useStreams, queryKey: streamsQueryKey } = createResourceQuery({
   name: 'streams',
   fetcher: fetchStreams,
-  refetchInterval: false,
+  isManual: true,
   transform: raw => ({
     ...raw,
     softcoreStreams: raw.streams.filter(isSoftcore),
@@ -50,7 +50,7 @@ export const fetchBuildTrends = async () => {
 export const { useResource: useBuildTrends, queryKey: buildTrendsQueryKey } = createResourceQuery({
   name: 'buildTrends',
   fetcher: fetchBuildTrends,
-  refetchInterval: false,
+  isManual: true,
   transform: raw => ({
     ...raw,
     softcoreStreams: raw.streams.filter(isSoftcore),
