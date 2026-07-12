@@ -3,3 +3,7 @@ dist
 
 # drizzle-kit-generated migrations + snapshots; never hand-edited or reformatted
 server/drizzle/
+
+# self-contained static docs (architecture diagram + Pages redirect); the
+# hand-authored HTML/CSS isn't meant to be reflowed
+docs/*.html

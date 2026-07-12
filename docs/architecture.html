@@ -1,0 +1,1099 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Edges-First Architecture — PoE2 Arbitrage Dashboard</title>
+<style>
+  /* Minimal reset — this file is self-contained (no build step, no external
+     assets), so it carries its own reset instead of relying on a host wrapper.
+     Theme follows the OS via prefers-color-scheme. */
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); }
+
+  :root {
+    /* light theme (default) */
+    --bg: #E7EAF0;
+    --panel: #FBFCFE;
+    --panel-2: #F0F3F8;
+    --border: #D2D8E2;
+    --border-strong: #B4BDCB;
+    --ink: #171B22;
+    --ink-2: #48505E;
+    --ink-3: #727B8A;
+    --divine: #B07E17;
+    --divine-soft: rgba(176, 126, 23, 0.12);
+    --exalted: #5C6879;
+    --chaos: #1C7E62;
+    --accent: var(--divine);
+    --grid-line: rgba(23, 27, 34, 0.06);
+    --shadow: 0 1px 2px rgba(20, 26, 40, 0.06), 0 8px 24px rgba(20, 26, 40, 0.06);
+    --before-bar: #9AA4B3;
+
+    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, "Cascadia Code", "SF Mono", "JetBrains Mono", "Segoe UI Mono", Menlo, Consolas, monospace;
+    --maxw: 1000px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0D1015;
+      --panel: #161A22;
+      --panel-2: #1B212B;
+      --border: #262D39;
+      --border-strong: #3A4351;
+      --ink: #E7EAF1;
+      --ink-2: #A6AFBE;
+      --ink-3: #6E7887;
+      --divine: #E4AE52;
+      --divine-soft: rgba(228, 174, 82, 0.14);
+      --exalted: #AEB9C8;
+      --chaos: #5FBE9C;
+      --grid-line: rgba(231, 234, 241, 0.05);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.32);
+      --before-bar: #5A6474;
+    }
+  }
+
+  :root[data-theme="light"] {
+    --bg: #E7EAF0;
+    --panel: #FBFCFE;
+    --panel-2: #F0F3F8;
+    --border: #D2D8E2;
+    --border-strong: #B4BDCB;
+    --ink: #171B22;
+    --ink-2: #48505E;
+    --ink-3: #727B8A;
+    --divine: #B07E17;
+    --divine-soft: rgba(176, 126, 23, 0.12);
+    --exalted: #5C6879;
+    --chaos: #1C7E62;
+    --grid-line: rgba(23, 27, 34, 0.06);
+    --shadow: 0 1px 2px rgba(20, 26, 40, 0.06), 0 8px 24px rgba(20, 26, 40, 0.06);
+    --before-bar: #9AA4B3;
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #0D1015;
+    --panel: #161A22;
+    --panel-2: #1B212B;
+    --border: #262D39;
+    --border-strong: #3A4351;
+    --ink: #E7EAF1;
+    --ink-2: #A6AFBE;
+    --ink-3: #6E7887;
+    --divine: #E4AE52;
+    --divine-soft: rgba(228, 174, 82, 0.14);
+    --exalted: #AEB9C8;
+    --chaos: #5FBE9C;
+    --grid-line: rgba(231, 234, 241, 0.05);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.32);
+    --before-bar: #5A6474;
+  }
+
+  * { box-sizing: border-box; }
+
+  .page {
+    background:
+      linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0 / 100% 34px,
+      var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    padding: clamp(20px, 5vw, 56px) clamp(16px, 5vw, 40px) 64px;
+    min-height: 100vh;
+  }
+
+  .wrap { max-width: var(--maxw); margin: 0 auto; }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .eyebrow .dot { color: var(--accent); }
+
+  h1 {
+    font-size: clamp(1.95rem, 4.4vw, 3.05rem);
+    line-height: 1.04;
+    letter-spacing: -0.022em;
+    font-weight: 720;
+    margin: 0;
+    text-wrap: balance;
+    max-width: 20ch;
+  }
+  h1 .accent { color: var(--accent); }
+
+  .lede {
+    color: var(--ink-2);
+    font-size: clamp(1rem, 1.6vw, 1.12rem);
+    max-width: 60ch;
+    margin: 18px 0 0;
+  }
+
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    margin-top: 26px;
+  }
+  .chip {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+    color: var(--ink-2);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 5px 11px;
+  }
+  .chip b { color: var(--ink); font-weight: 600; }
+
+  /* ---- section scaffolding ---- */
+  section { margin-top: clamp(40px, 6vw, 68px); }
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+  }
+  .sec-kicker {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .sec-title {
+    font-size: clamp(1.15rem, 2.2vw, 1.45rem);
+    font-weight: 660;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  .sec-note { color: var(--ink-3); font-size: 0.9rem; margin: 0; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+  }
+
+  /* ---- payload shrink chart ---- */
+  .shrink { padding: clamp(20px, 3vw, 30px); }
+  .bars { display: flex; flex-direction: column; gap: 18px; margin-top: 4px; }
+  .bar-row { display: grid; grid-template-columns: 1fr; gap: 7px; }
+  .bar-top {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  }
+  .bar-label { font-size: 0.9rem; color: var(--ink-2); }
+  .bar-label b { color: var(--ink); font-weight: 600; }
+  .bar-val {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  .bar-track {
+    height: 14px;
+    background: var(--panel-2);
+    border-radius: 7px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .bar-fill { height: 100%; border-radius: 6px 0 0 6px; }
+  .bar-fill.before { background: var(--before-bar); }
+  .bar-fill.mid { background: var(--exalted); }
+  .bar-fill.win {
+    background: linear-gradient(90deg, var(--divine), color-mix(in srgb, var(--divine) 70%, #fff 30%));
+  }
+  .shrink-foot {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    color: var(--ink-2);
+    font-size: 0.9rem;
+  }
+  .shrink-foot b { color: var(--accent); font-weight: 600; }
+
+  /* ---- pipeline spine ---- */
+  .pipeline { list-style: none; margin: 0; padding: 0; }
+  .stage {
+    display: grid;
+    grid-template-columns: 46px 1fr;
+    gap: clamp(14px, 2.4vw, 24px);
+    padding-bottom: 26px;
+  }
+  .stage__rail { position: relative; display: flex; justify-content: center; }
+  .stage__rail::before {
+    content: "";
+    position: absolute;
+    top: 40px;
+    bottom: -26px;
+    width: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--border-strong);
+  }
+  .stage:last-child .stage__rail::before { display: none; }
+  .stage__num {
+    width: 40px; height: 40px;
+    flex: none;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--ink);
+    background: var(--panel);
+    border: 1.5px solid var(--border-strong);
+    position: relative;
+    z-index: 1;
+  }
+  .stage__num.src { border-color: var(--exalted); color: var(--exalted); }
+  .stage__num.derive { border-color: var(--divine); color: var(--divine); }
+
+  .stage__card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    box-shadow: var(--shadow);
+  }
+  .stage__tag {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .stage__title {
+    font-size: 1.02rem;
+    font-weight: 640;
+    margin: 3px 0 8px;
+    letter-spacing: -0.01em;
+  }
+  .stage__desc { margin: 0; color: var(--ink-2); font-size: 0.92rem; }
+  .stage__facts {
+    list-style: none;
+    margin: 12px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .stage__facts li {
+    font-size: 0.85rem;
+    color: var(--ink-2);
+    padding-left: 16px;
+    position: relative;
+  }
+  .stage__facts li::before {
+    content: "›";
+    position: absolute; left: 2px; top: -1px;
+    color: var(--accent);
+    font-weight: 700;
+  }
+  code, .mono {
+    font-family: var(--font-mono);
+    font-size: 0.86em;
+    background: var(--divine-soft);
+    color: var(--ink);
+    padding: 1px 6px;
+    border-radius: 5px;
+  }
+
+  /* ---- the boundary marker ---- */
+  .boundary {
+    grid-column: 1 / -1;
+    margin: 2px 0 26px;
+    border: 1.5px dashed var(--accent);
+    border-radius: 12px;
+    background: var(--divine-soft);
+    padding: 14px 18px;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .boundary .b-key {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .boundary .b-text { color: var(--ink-2); font-size: 0.9rem; margin: 0; }
+  .boundary .b-text b { color: var(--ink); font-weight: 600; }
+  .boundary .b-payload {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 6px 10px;
+    white-space: nowrap;
+  }
+
+  /* ---- graph model split ---- */
+  .split {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: 20px;
+    align-items: stretch;
+  }
+  .graph-card { padding: 22px; display: flex; flex-direction: column; }
+  .graph-card h3, .explain h3 {
+    font-size: 1rem; font-weight: 640; margin: 0 0 4px;
+  }
+  .graph-card .sub { color: var(--ink-3); font-size: 0.85rem; margin: 0 0 8px; }
+  .graph-wrap { flex: 1; display: grid; place-items: center; }
+  svg { max-width: 100%; height: auto; display: block; }
+
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 10px 16px;
+    margin-top: 14px; padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .legend span {
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    color: var(--ink-2);
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+
+  .explain { padding: 22px; display: flex; flex-direction: column; gap: 14px; }
+  .explain p { margin: 0; color: var(--ink-2); font-size: 0.92rem; }
+  .explain .rule {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: 12px 14px;
+    color: var(--ink);
+    overflow-x: auto;
+  }
+  .explain .rule b { color: var(--accent); }
+  .explain .callout {
+    color: var(--ink);
+    font-size: 0.92rem;
+    font-weight: 500;
+  }
+  .explain .callout b { color: var(--accent); font-weight: 700; }
+
+  /* ---- decision record ---- */
+  .record { padding: 6px clamp(18px, 3vw, 28px) 12px; }
+  .rec-row {
+    display: grid;
+    grid-template-columns: 128px 1fr;
+    gap: 8px 22px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+    align-items: baseline;
+  }
+  .rec-row:last-child { border-bottom: none; }
+  .rec-key {
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .rec-val { color: var(--ink-2); font-size: 0.94rem; margin: 0; }
+  .rec-val b { color: var(--ink); font-weight: 600; }
+
+  /* ---- footer ---- */
+  .foot {
+    margin-top: clamp(40px, 6vw, 64px);
+    padding: 24px clamp(18px, 3vw, 28px);
+    border-radius: 14px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  .foot h3 { margin: 0 0 8px; font-size: 1rem; font-weight: 640; }
+  .foot p { margin: 0; color: var(--ink-2); font-size: 0.92rem; max-width: 72ch; }
+  .fn-list {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin: 16px 0 0;
+  }
+  .fn {
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    color: var(--ink);
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 6px 10px;
+  }
+  .credit {
+    margin-top: 22px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--ink-3);
+    letter-spacing: 0.04em;
+  }
+
+  /* ---- tech stack ---- */
+  .tenets {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .tenet {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .tenet .t-num {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .tenet .t-text { font-size: 0.9rem; color: var(--ink); margin: 4px 0 0; font-weight: 500; }
+  .tenet .t-text span { color: var(--ink-3); font-weight: 400; }
+
+  .stack-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .tier {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-top: 2px solid var(--tier, var(--accent));
+    border-radius: 12px;
+    padding: 18px 18px 20px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+  }
+  .tier--core { --tier: var(--divine); }
+  .tier--server { --tier: var(--exalted); }
+  .tier--client { --tier: var(--chaos); }
+  .tier__eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    color: var(--ink-3);
+  }
+  .tier__title { font-size: 1.02rem; font-weight: 660; margin: 3px 0 8px; letter-spacing: -0.01em; }
+  .tier__principle {
+    color: var(--ink-2);
+    font-size: 0.86rem;
+    margin: 0 0 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .dep-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 11px; }
+  .dep-list li { font-size: 0.85rem; color: var(--ink-2); line-height: 1.5; }
+  .dep-list .name {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--ink);
+    background: var(--divine-soft);
+    padding: 1px 6px;
+    border-radius: 5px;
+    white-space: nowrap;
+  }
+  .tooling {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 18px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+  .tooling .lbl {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin-right: 4px;
+  }
+  .tooling .tool {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 9px;
+  }
+  @media (max-width: 820px) {
+    .tenets, .stack-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ---- evolution timeline ---- */
+  .themes { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 28px; }
+  .theme-key {
+    display: flex; align-items: flex-start; gap: 10px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 15px; flex: 1 1 230px;
+  }
+  .theme-key .k-dot { width: 11px; height: 11px; border-radius: 50%; margin-top: 4px; flex: none; }
+  .theme-key .k-title { font-size: 0.85rem; font-weight: 660; color: var(--ink); }
+  .theme-key .k-num { font-family: var(--font-mono); color: var(--ink-3); margin-right: 5px; }
+  .theme-key .k-gloss { font-size: 0.8rem; color: var(--ink-3); margin-top: 2px; }
+  .kc1 { background: var(--divine); }
+  .kc2 { background: var(--exalted); }
+  .kc3 { background: var(--chaos); }
+
+  .timeline { list-style: none; margin: 0; padding: 0; }
+  .tl-item { display: grid; grid-template-columns: 74px 22px 1fr; gap: 14px; padding-bottom: 22px; }
+  .tl-date {
+    font-family: var(--font-mono); font-size: 0.74rem; color: var(--ink-3);
+    text-align: right; padding-top: 1px; line-height: 1.35;
+  }
+  .tl-rail { position: relative; }
+  .tl-rail::before {
+    content: ""; position: absolute; left: 50%; transform: translateX(-50%);
+    top: 16px; bottom: -22px; width: 2px; background: var(--border-strong);
+  }
+  .tl-item:last-child .tl-rail::before { display: none; }
+  .tl-dot {
+    position: absolute; left: 50%; top: 4px; transform: translateX(-50%);
+    width: 13px; height: 13px; border-radius: 50%;
+    background: var(--ink-3); border: 2px solid var(--bg);
+    box-shadow: 0 0 0 1px var(--border-strong); z-index: 1;
+  }
+  .tl-dot.d1 { background: var(--divine); box-shadow: 0 0 0 1px var(--divine), 0 0 10px var(--divine-soft); }
+  .tl-dot.d2 { background: var(--exalted); box-shadow: 0 0 0 1px var(--exalted); }
+  .tl-dot.d3 { background: var(--chaos); box-shadow: 0 0 0 1px var(--chaos); }
+  .tl-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 15px 17px; box-shadow: var(--shadow);
+  }
+  .tl-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 6px; }
+  .tl-title { font-size: 1rem; font-weight: 660; letter-spacing: -0.01em; margin: 0; }
+  .tl-star { color: var(--divine); }
+  .tl-badge {
+    font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.1em;
+    text-transform: uppercase; font-weight: 700; color: var(--exalted);
+    border: 1px solid var(--exalted); border-radius: 999px; padding: 2px 8px;
+  }
+  .tl-change { margin: 0; font-size: 0.9rem; color: var(--ink-2); }
+  .tl-change code { font-size: 0.82em; }
+  .tl-why {
+    margin: 11px 0 0; font-size: 0.88rem; color: var(--ink);
+    background: var(--panel-2); border-left: 3px solid var(--accent);
+    border-radius: 8px; padding: 9px 12px;
+  }
+  .tl-why b {
+    color: var(--accent); font-family: var(--font-mono); font-size: 0.68rem;
+    letter-spacing: 0.1em; text-transform: uppercase; margin-right: 7px;
+  }
+  @media (max-width: 640px) {
+    .tl-item { grid-template-columns: 54px 18px 1fr; gap: 10px; }
+  }
+
+  @media (max-width: 720px) {
+    .split { grid-template-columns: 1fr; }
+    .rec-row { grid-template-columns: 1fr; gap: 4px; }
+    .stage { grid-template-columns: 40px 1fr; }
+  }
+
+  .fade { opacity: 0; transform: translateY(10px); animation: rise 0.6s ease forwards; }
+  .fade:nth-child(2) { animation-delay: 0.05s; }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+
+  .pulse { transform-box: fill-box; transform-origin: center; animation: pulse 3.2s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.7; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .fade { opacity: 1; transform: none; animation: none; }
+    .pulse { animation: none; opacity: 0.5; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="wrap">
+
+    <header class="fade">
+      <p class="eyebrow"><span class="dot">◆</span> Architecture Decision &nbsp;·&nbsp; PoE2 Arbitrage Dashboard</p>
+      <h1>Normalize at the boundary,<br><span class="accent">derive at the edge</span>.</h1>
+      <p class="lede">
+        The economy API shipped ~588&nbsp;KB of precomputed, denormalized views, and every new
+        view cost a server change. So I inverted it: the server ships the <em>minimal source</em> —
+        raw exchange edges — and the browser derives every view. New views became a one-file,
+        client-only change.
+      </p>
+      <div class="meta-row">
+        <span class="chip"><b>Stack</b> TypeScript · Fastify · React · TanStack Query · Zod</span>
+        <span class="chip"><b>Monorepo</b> shared / server / client</span>
+        <span class="chip"><b>Source</b> poe.ninja economy + builds API</span>
+      </div>
+    </header>
+
+    <!-- OUTCOME FIRST -->
+    <section class="fade">
+      <div class="sec-head">
+        <span class="sec-kicker">Outcome</span>
+        <h2 class="sec-title">What crosses the wire</h2>
+        <p class="sec-note">same data, three representations</p>
+      </div>
+      <div class="panel shrink">
+        <div class="bars">
+          <div class="bar-row">
+            <div class="bar-top">
+              <span class="bar-label"><b>Precomputed views</b> — denormalized cycles + rates, server-built</span>
+              <span class="bar-val">588 KB</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill before" style="width:100%"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-top">
+              <span class="bar-label"><b>Raw edges</b> — normalized source (edges + value/icon/hub maps)</span>
+              <span class="bar-val">271 KB &nbsp;·&nbsp; −54%</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill mid" style="width:46%"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-top">
+              <span class="bar-label"><b>Raw edges, gzipped</b> — <code>@fastify/compress</code> on the same source</span>
+              <span class="bar-val">54 KB &nbsp;·&nbsp; −91%</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill win" style="width:9.2%"></div></div>
+          </div>
+        </div>
+        <p class="shrink-foot">
+          The old payload was <b>53% arbitrage cycles alone</b> — a 729-cycle explosion over ~1,165 edges,
+          plus another 22% of best-buy / best-sell tables that are cheap to recompute. Shipping the source
+          instead of its expansions is where the win comes from; gzip is just the finish.
+        </p>
+      </div>
+    </section>
+
+    <!-- PIPELINE -->
+    <section>
+      <div class="sec-head">
+        <span class="sec-kicker">Data flow</span>
+        <h2 class="sec-title">Source → boundary → derived views</h2>
+        <p class="sec-note">one fetch, cached; every view recomputed in the browser</p>
+      </div>
+
+      <ol class="pipeline">
+        <li class="stage">
+          <div class="stage__rail"><div class="stage__num src">01</div></div>
+          <div class="stage__card">
+            <span class="stage__tag">Source · poe.ninja</span>
+            <h3 class="stage__title">Undocumented external economy API</h3>
+            <p class="stage__desc">14 exchange categories (Currency, Runes, Essences, …), plus a binary-protobuf builds feed with no published schema.</p>
+            <ul class="stage__facts">
+              <li>Every category prices against the same <b>Divine / Exalted / Chaos</b> hub</li>
+              <li>Builds facets decoded schema-lessly with <code>pbf</code> + reverse-engineered field numbers</li>
+            </ul>
+          </div>
+        </li>
+
+        <li class="stage">
+          <div class="stage__rail"><div class="stage__num">02</div></div>
+          <div class="stage__card">
+            <span class="stage__tag">Server · Poller</span>
+            <h3 class="stage__title">Rate-limited fan-out on an interval</h3>
+            <p class="stage__desc">One poll issues hundreds of throttled requests and runs for <em>minutes</em> — longer than the interval itself.</p>
+            <ul class="stage__facts">
+              <li><b>Skip-if-running guard</b> keeps exactly one poll in flight; no starving backlog</li>
+              <li>Snapshot persisted to SQLite → instant render on restart; serve-last-good on error</li>
+              <li>Throttle + retry via <code>fetch-extras</code>, not hand-rolled</li>
+            </ul>
+          </div>
+        </li>
+
+        <li class="stage">
+          <div class="stage__rail"><div class="stage__num">03</div></div>
+          <div class="stage__card">
+            <span class="stage__tag">Transport · GET /api/arbitrages</span>
+            <h3 class="stage__title">Ship the source, take no query params</h3>
+            <p class="stage__desc">Returns the full edge set once. No <code>?categories=</code>, no <code>?minProfit=</code> — filtering happens client-side over derived rows, so the response is cacheable and identical for everyone.</p>
+            <ul class="stage__facts">
+              <li>On-demand refresh → <code>202</code> immediately; concurrent clicks coalesced</li>
+              <li><code>isRefreshing</code> / <code>dataAgeMs</code> surface freshness to the UI</li>
+            </ul>
+          </div>
+        </li>
+
+        <li class="stage">
+          <div class="boundary">
+            <span class="b-key">⟶ The boundary</span>
+            <span class="b-payload">edges · currencyValues · currencyIcons · hubs</span>
+            <p class="b-text"><b>Normalize here, derive downstream.</b> This is the only precomputed thing the server owns — the minimal economy source.</p>
+          </div>
+        </li>
+
+        <li class="stage">
+          <div class="stage__rail"><div class="stage__num derive">04</div></div>
+          <div class="stage__card">
+            <span class="stage__tag">Client · deriveEconomy (react-query transform)</span>
+            <h3 class="stage__title">Rebuild every view from edges — once per fetch, cached</h3>
+            <p class="stage__desc">Runs inside the query function, so components read the same fields they did when the server precomputed them.</p>
+            <ul class="stage__facts">
+              <li><code>buildGraph</code> → adjacency map · <code>findTriangularArbitrages</code> → cycles (<b>~47 ms</b>)</li>
+              <li><code>computeBestExchange</code> → per-hub buy/sell · <code>computeCurrencyCategories</code></li>
+              <li>Edge-driven &amp; sparse — headroom to move to a web worker if it ever grows</li>
+            </ul>
+          </div>
+        </li>
+
+        <li class="stage">
+          <div class="stage__rail"><div class="stage__num">05</div></div>
+          <div class="stage__card">
+            <span class="stage__tag">Views · Exchanges widget</span>
+            <h3 class="stage__title">Arbitrage · Rates · Currency Explorer</h3>
+            <p class="stage__desc">Category chips, profit / volume thresholds, per-hub comparisons — all read from the derived cache.</p>
+            <ul class="stage__facts">
+              <li>A new derived view is a <b>client-only change</b>: extend <code>deriveEconomy</code> or add a shared function</li>
+            </ul>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- GRAPH MODEL -->
+    <section>
+      <div class="sec-head">
+        <span class="sec-kicker">Domain model</span>
+        <h2 class="sec-title">The economy is a directed weighted graph</h2>
+        <p class="sec-note">arbitrage = a cycle whose rate product exceeds 1</p>
+      </div>
+
+      <div class="split">
+        <div class="panel graph-card">
+          <h3>Triangular arbitrage, across categories</h3>
+          <p class="sub">Exalted → Rune → Divine → Exalted</p>
+          <div class="graph-wrap">
+            <svg viewBox="0 0 400 340" role="img" aria-label="Triangular arbitrage cycle: Exalted to Rune to Divine and back, with rate product 1.036 yielding plus 3.6 percent">
+              <defs>
+                <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                  <path d="M0,0 L10,5 L0,10 z" fill="var(--ink-3)"></path>
+                </marker>
+                <marker id="arrow-gold" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                  <path d="M0,0 L10,5 L0,10 z" fill="var(--divine)"></path>
+                </marker>
+                <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="var(--divine)" stop-opacity="0.5"></stop>
+                  <stop offset="100%" stop-color="var(--divine)" stop-opacity="0"></stop>
+                </radialGradient>
+              </defs>
+
+              <!-- profit glow behind center -->
+              <circle class="pulse" cx="200" cy="205" r="78" fill="url(#glow)"></circle>
+
+              <!-- edges (directed) -->
+              <!-- Exalted (66,262) -> Rune (334,262) : bottom -->
+              <path d="M96,262 L304,262" fill="none" stroke="var(--ink-3)" stroke-width="2" marker-end="url(#arrow)"></path>
+              <!-- Rune (334,262) -> Divine (200,66) : right side, going up-left -->
+              <path d="M322,236 L212,88" fill="none" stroke="var(--ink-3)" stroke-width="2" marker-end="url(#arrow)"></path>
+              <!-- Divine (200,66) -> Exalted (66,262) : left side, going down-left (the closing gold leg) -->
+              <path d="M188,88 L78,236" fill="none" stroke="var(--divine)" stroke-width="2.4" marker-end="url(#arrow-gold)"></path>
+
+              <!-- edge labels -->
+              <text x="200" y="252" text-anchor="middle" font-family="var(--font-mono)" font-size="13" fill="var(--ink-2)" paint-order="stroke" stroke="var(--panel)" stroke-width="4">×132</text>
+              <text x="286" y="168" text-anchor="middle" font-family="var(--font-mono)" font-size="13" fill="var(--ink-2)" paint-order="stroke" stroke="var(--panel)" stroke-width="4">×0.0072</text>
+              <text x="112" y="168" text-anchor="middle" font-family="var(--font-mono)" font-size="13" fill="var(--divine)" font-weight="700" paint-order="stroke" stroke="var(--panel)" stroke-width="4">×1.09</text>
+
+              <!-- nodes -->
+              <g>
+                <circle cx="200" cy="66" r="26" fill="var(--panel-2)" stroke="var(--divine)" stroke-width="2.5"></circle>
+                <text x="200" y="35" text-anchor="middle" font-family="var(--font-mono)" font-size="12" fill="var(--ink)">Divine</text>
+              </g>
+              <g>
+                <circle cx="66" cy="262" r="26" fill="var(--panel-2)" stroke="var(--exalted)" stroke-width="2.5"></circle>
+                <text x="66" y="308" text-anchor="middle" font-family="var(--font-mono)" font-size="12" fill="var(--ink)">Exalted</text>
+              </g>
+              <g>
+                <circle cx="334" cy="262" r="26" fill="var(--panel-2)" stroke="var(--chaos)" stroke-width="2.5"></circle>
+                <text x="334" y="308" text-anchor="middle" font-family="var(--font-mono)" font-size="12" fill="var(--ink)">Rune</text>
+              </g>
+
+              <!-- center product -->
+              <text x="200" y="200" text-anchor="middle" font-family="var(--font-mono)" font-size="15" font-weight="700" fill="var(--ink)">∏ rate = 1.036</text>
+              <text x="200" y="221" text-anchor="middle" font-family="var(--font-mono)" font-size="13" fill="var(--divine)" font-weight="700">+3.6% cycle</text>
+            </svg>
+          </div>
+          <div class="legend">
+            <span><i class="swatch" style="background:var(--divine)"></i>Divine hub</span>
+            <span><i class="swatch" style="background:var(--exalted)"></i>Exalted hub</span>
+            <span><i class="swatch" style="background:var(--chaos)"></i>Runes category</span>
+          </div>
+        </div>
+
+        <div class="panel explain">
+          <div>
+            <h3>Why brute force beats Bellman-Ford here</h3>
+            <p>A few dozen currencies means all ordered triples is at most ~10⁵ checks — cheap, exhaustive, and trivial to reason about. No negative-log-weight transform needed.</p>
+          </div>
+          <div class="rule">for (A,B,C):&nbsp; <b>rate(A→B) · rate(B→C) · rate(C→A) &gt; 1</b><br>&nbsp;&nbsp;· rotations canonicalized (one cycle, once)<br>&nbsp;&nbsp;· both directions kept (rates are asymmetric)</div>
+          <p class="callout">The unlock: every category prices against the <b>same three hubs</b>, so all categories merge into <b>one graph</b> — and profitable cycles route <em>across</em> them.</p>
+          <p><b>Honesty rules:</b> observed edges only, never invert a rate to fake the other direction, and route intermediates only through hubs — the path a player would actually take.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- TECH STACK -->
+    <section>
+      <div class="sec-head">
+        <span class="sec-kicker">Technical stack</span>
+        <h2 class="sec-title">A thin framework-free core, tested tools around it</h2>
+        <p class="sec-note">chosen to make the edges-first inversion cheap and safe</p>
+      </div>
+
+      <div class="tenets">
+        <div class="tenet">
+          <span class="t-num">01</span>
+          <p class="t-text">Framework-free core. <span>The domain layer has one runtime dependency and runs anywhere.</span></p>
+        </div>
+        <div class="tenet">
+          <span class="t-num">02</span>
+          <p class="t-text">Buy, don't build. <span>Reach for a tested library for every solved problem.</span></p>
+        </div>
+        <div class="tenet">
+          <span class="t-num">03</span>
+          <p class="t-text">One contract, validated twice. <span>Zod schemas parsed on both ends of the wire.</span></p>
+        </div>
+      </div>
+
+      <div class="stack-grid">
+        <div class="tier tier--core">
+          <span class="tier__eyebrow">packages/shared</span>
+          <h3 class="tier__title">The load-bearing layer</h3>
+          <p class="tier__principle">No framework. The graph + arbitrage math run identically on server or client — the reason moving the compute across the wire is safe.</p>
+          <ul class="dep-list">
+            <li><span class="name">zod</span> — the <em>only</em> runtime dep; request and response contracts from one source of truth</li>
+            <li><span class="name">typescript</span> — pure functions, fully typed at the boundary</li>
+            <li><span class="name">vitest</span> — the derivations unit-tested in isolation, no framework harness</li>
+          </ul>
+        </div>
+
+        <div class="tier tier--server">
+          <span class="tier__eyebrow">server</span>
+          <h3 class="tier__title">Thin, sharp tools</h3>
+          <p class="tier__principle">Fetch, normalize, persist, stay fresh — and nothing more. Every non-trivial concern is a tested library, not bespoke code.</p>
+          <ul class="dep-list">
+            <li><span class="name">fastify</span> + <span class="name">@fastify/compress</span> + <span class="name">@fastify/static</span> — schema-first HTTP; compress <em>is</em> the gzip win; static serves the built client in prod</li>
+            <li><span class="name">drizzle-orm</span> + <span class="name">better-sqlite3</span> — durable atlas strategies + per-league restart-cache snapshots, layered slice write path</li>
+            <li><span class="name">fetch-extras</span> — rate-limiting + retry, bought not hand-rolled</li>
+            <li><span class="name">pbf</span> — schema-less protobuf decode of the builds feed</li>
+            <li><span class="name">@anthropic-ai/sdk</span> — Claude Haiku 4.5 tags Twitch titles; degrades to untagged on failure</li>
+          </ul>
+        </div>
+
+        <div class="tier tier--client">
+          <span class="tier__eyebrow">client</span>
+          <h3 class="tier__title">Composition over hand-rolling</h3>
+          <p class="tier__principle">React 19 + Vite. The query cache doubles as the derived-view store; the UI is assembled from accessible primitives.</p>
+          <ul class="dep-list">
+            <li><span class="name">@tanstack/react-query</span> — the cache layer; <code>deriveEconomy</code> lives in its transform</li>
+            <li><span class="name">@tanstack/react-table</span> — headless data grids for the rate tables</li>
+            <li><span class="name">radix-ui</span> + <span class="name">shadcn</span> + <span class="name">tailwind v4</span> — accessible primitives, not custom widgets</li>
+            <li><span class="name">downshift</span> · <span class="name">react-router</span> — a11y autocomplete; routing with state persistence</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="tooling">
+        <span class="lbl">Toolchain</span>
+        <span class="tool">npm workspaces</span>
+        <span class="tool">ESLint 9 flat + typescript-eslint</span>
+        <span class="tool">Prettier</span>
+        <span class="tool">Vitest</span>
+        <span class="tool">tsx (zero-build dev)</span>
+      </div>
+    </section>
+
+    <!-- EVOLUTION TIMELINE -->
+    <section>
+      <div class="sec-head">
+        <span class="sec-kicker">Evolution</span>
+        <h2 class="sec-title">How the architecture changed — and why</h2>
+        <p class="sec-note">14 commits · Jul 1 → 11, 2026</p>
+      </div>
+
+      <p class="lede" style="margin: -6px 0 24px; max-width: 76ch;">
+        The shape wasn't designed up front — it converged. Three recurring judgments
+        drove nearly every structural change, and twice a decision was reversed once
+        it earned a clearer answer.
+      </p>
+
+      <div class="themes">
+        <div class="theme-key">
+          <span class="k-dot kc1"></span>
+          <div>
+            <div class="k-title"><span class="k-num">①</span>Compute at the edge</div>
+            <div class="k-gloss">Push derivation into a portable, framework-free core</div>
+          </div>
+        </div>
+        <div class="theme-key">
+          <span class="k-dot kc2"></span>
+          <div>
+            <div class="k-title"><span class="k-num">②</span>Right-size persistence</div>
+            <div class="k-gloss">Add durability only where the data can honor it</div>
+          </div>
+        </div>
+        <div class="theme-key">
+          <span class="k-dot kc3"></span>
+          <div>
+            <div class="k-title"><span class="k-num">③</span>Fetch on demand</div>
+            <div class="k-gloss">Lazy fetch + snapshot restore over background polling</div>
+          </div>
+        </div>
+      </div>
+
+      <ol class="timeline">
+        <li class="tl-item">
+          <div class="tl-date">Jul 1</div>
+          <div class="tl-rail"><span class="tl-dot"></span></div>
+          <div class="tl-card">
+            <div class="tl-head">
+              <h3 class="tl-title">v0 — server-computed opportunities</h3>
+              <span class="tl-badge" style="color: var(--ink-3); border-color: var(--border-strong);">Baseline</span>
+            </div>
+            <p class="tl-change">Server polls poe.ninja, builds the rate graph, brute-forces cycles, and serves computed <code>/api/opportunities?minProfit=&amp;minVolume=</code>. The client is a thin auto-refreshing table.</p>
+            <p class="tl-why"><b>Why</b>Ship one end-to-end vertical slice first. The simplest model is "the server does the work, the client renders."</p>
+          </div>
+        </li>
+
+        <li class="tl-item">
+          <div class="tl-date">Jul 4</div>
+          <div class="tl-rail"><span class="tl-dot d3"></span></div>
+          <div class="tl-card">
+            <div class="tl-head">
+              <h3 class="tl-title">On-demand poll + URL-persisted UI state</h3>
+            </div>
+            <p class="tl-change">Added a manual <code>pollOnce</code>; front-end routing with persisted filter state; switched an effect to a ref.</p>
+            <p class="tl-why"><b>Why · ③</b>Upstream is rate-limited and slow — blind auto-refresh wastes budget. Hand refresh control to the user and keep view state in the URL.</p>
+          </div>
+        </li>
+
+        <li class="tl-item">
+          <div class="tl-date">Jul 7</div>
+          <div class="tl-rail"><span class="tl-dot d1"></span></div>
+          <div class="tl-card">
+            <div class="tl-head">
+              <h3 class="tl-title">The inversion — server → pure snapshot, derive on client</h3>
+              <span class="tl-star" title="flagship decision">★</span>
+            </div>
+            <p class="tl-change">A 34-file refactor: moved the graph + arbitrage math out of <code>server/</code> into the framework-free <code>packages/shared</code>, added <code>bestExchange</code> + <code>currencyCategories</code>, deleted the server-side filters. The server stops computing views and ships raw edges; the client derives every view in the react-query transform.</p>
+            <p class="tl-why"><b>Why · ①</b>The payload was 588&nbsp;KB of denormalized precomputed views — cycles alone were 53%, and each new view cost a schema + poller + server change. Inverting made new views a client-only change and dropped the payload to 271&nbsp;KB / 54&nbsp;KB gzipped. (Full decision record below.)</p>
+          </div>
+        </li>
+
+        <li class="tl-item">
+          <div class="tl-date">Jul 9</div>
+          <div class="tl-rail"><span class="tl-dot d2"></span></div>
+          <div class="tl-card">
+            <div class="tl-head">
+              <h3 class="tl-title">Persistence, right-sized — SQLite + Drizzle slices</h3>
+              <span class="tl-badge">Revisited</span>
+            </div>
+            <p class="tl-change">Introduced Drizzle over better-sqlite3 with a layered slice architecture (router → service → dbFunctions) for atlas and economy. Economy snapshots persist as a restart cache — one upserted row per league, no history; atlas strategies get durable CRUD.</p>
+            <p class="tl-why"><b>Why · ②</b>An earlier trade-tracking DB had been built and then deleted — per-trade attribution turned out to be fiction. The database returns only where it earns its place: durable user data and a restart cache, never history the data can't honestly support.</p>
+          </div>
+        </li>
+
+        <li class="tl-item">
+          <div class="tl-date">Jul 9</div>
+          <div class="tl-rail"><span class="tl-dot"></span></div>
+          <div class="tl-card">
+            <div class="tl-head">
+              <h3 class="tl-title">Deploy groundwork — Docker + CI</h3>
+              <span class="tl-badge" style="color: var(--ink-3); border-color: var(--border-strong);">Ops</span>
+            </div>
+            <p class="tl-change">A Dockerfile that serves the built client from the same container via <code>@fastify/static</code>, a GitHub Actions workflow, and <code>HOST</code> / <code>CLIENT_DIST</code> wiring. Target: a Raspberry Pi (arm64).</p>
+            <p class="tl-why"><b>Why</b>One artifact, one container, one small always-on box. No orchestration is warranted for a single-user tool.</p>
+          </div>
+        </li>
+
+        <li class="tl-item">
+          <div class="tl-date">Jul 11</div>
+          <div class="tl-rail"><span class="tl-dot d3"></span></div>
+          <div class="tl-card">
+            <div class="tl-head">
+              <h3 class="tl-title">Generalize the pattern — Twitch goes on-demand</h3>
+            </div>
+            <p class="tl-change">Converted the Twitch slice from a background poller to lazy on-demand + snapshot restore + manual refresh — the same pattern first forged for the economy. Claude tagging now fires only on demand, never on a timer.</p>
+            <p class="tl-why"><b>Why · ③</b>Twitch data is stale-tolerant and every fetch spends Twitch <em>and</em> Claude tokens. Don't poll what you can fetch when asked and cache across restarts — a pattern proven on the economy, now reused.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- DECISION RECORD -->
+    <section>
+      <div class="sec-head">
+        <span class="sec-kicker">Decision record</span>
+        <h2 class="sec-title">The call, structured the way you asked</h2>
+        <p class="sec-note">problem · constraints · options · choice · outcome</p>
+      </div>
+      <div class="panel record">
+        <div class="rec-row">
+          <span class="rec-key">Problem</span>
+          <p class="rec-val">The economy payload was mostly <b>denormalized precomputed views</b> — the cycle list alone was 53% of ~588&nbsp;KB — and each new view meant a schema + poller + persistence + server change.</p>
+        </div>
+        <div class="rec-row">
+          <span class="rec-key">Constraints</span>
+          <p class="rec-val">poe.ninja is rate-limited and a poll takes minutes; the UI must stay responsive; I wanted to <b>iterate on views quickly</b> without a deploy each time.</p>
+        </div>
+        <div class="rec-row">
+          <span class="rec-key">Options</span>
+          <p class="rec-val">(a) Keep precomputing server-side; (b) ship normalized edges and derive on the client; (c) ship edges and derive in a web worker.</p>
+        </div>
+        <div class="rec-row">
+          <span class="rec-key">Choice</span>
+          <p class="rec-val">Ship the minimal source and derive on the client via <b>framework-free pure functions</b> in a shared package — because the triangular search is sparse (~47&nbsp;ms) and browser compute is plainly affordable. Worker deferred until measured need.</p>
+        </div>
+        <div class="rec-row">
+          <span class="rec-key">Outcome</span>
+          <p class="rec-val">Payload <b>588 → 271 KB raw → ~54 KB gzipped</b>; new views are one-file client changes; the server's responsibility shrank to fetching, normalizing, and staying fresh.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTER: the symmetry -->
+    <div class="foot">
+      <h3>What makes the inversion safe</h3>
+      <p>
+        Everything past the boundary is a pure function — no framework, no I/O — living in <code>@poe2-dashboard/shared</code>
+        and unit-tested in isolation. The same code runs identically whether the server or the browser calls it, so moving
+        the computation across the wire changed <em>where</em> it runs, never <em>what</em> it returns.
+      </p>
+      <div class="fn-list">
+        <span class="fn">buildGraph()</span>
+        <span class="fn">findTriangularArbitrages()</span>
+        <span class="fn">computeBestExchange()</span>
+        <span class="fn">computeCurrencyCategories()</span>
+      </div>
+      <p class="credit">EDGES-FIRST ECONOMY · normalize at the boundary, derive at the edge</p>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

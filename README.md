@@ -7,6 +7,11 @@ manually in-game.
 
 ## Architecture
 
+A visual walkthrough of everything below — the edges-first data flow, the graph
+model, the stack, and how the design evolved over 14 commits — lives in
+[`docs/architecture.html`](docs/architecture.html) (a self-contained page; open
+it in a browser).
+
 **Edges-first: normalize at the boundary, derive at the edge.** The server
 ships the _minimal economy source_ — raw exchange edges plus the per-currency
 value/icon maps and hub names — and the client derives every view (arbitrage
