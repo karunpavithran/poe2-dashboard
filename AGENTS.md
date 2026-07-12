@@ -5,7 +5,7 @@
 npm workspaces monorepo:
 
 - `packages/shared` — domain types, API shapes, Zod schemas. No runtime dependencies on server or client.
-- `server` — Fastify v5 backend, pollers, business logic. Runs via `tsx` + Node 22 `--env-file`.
+- `server` — Fastify v5 backend: poe.ninja/Twitch fetchers, SQLite persistence (Drizzle), and serving the built SPA in production. DB-touching features are organized into vertical slices (see **Persistence & database**). Runs via `tsx` + Node 22 `--env-file`.
 - `client` — Vite + React 19 SPA.
 
 ## TypeScript
@@ -82,6 +82,37 @@ npm workspaces monorepo:
 - Use Zod to parse data at **system boundaries**: poe.ninja API responses, Twitch API responses, and the client validating the server's own API responses.
 - Do not use Zod for internal function arguments — trust TypeScript there. Do not add schemas for internally-computed shapes that never cross a boundary (e.g. `RateEdge`, `Snapshot`); those stay as hand-written types.
 - Extract every nested object as its own named schema (mirroring the no-inline-nesting type rule), so the derived type has a name too.
+
+## Persistence & database (server)
+
+- Storage is SQLite via **Drizzle ORM** over `better-sqlite3`, schema-first. The single connection (`server/src/db/client.ts`) runs under WAL with `synchronous = NORMAL` and `foreign_keys = ON`.
+- **Migrations are generated, never hand-written.** Run `npm run db:generate -w server` (`drizzle-kit generate`) after a schema change and commit the SQL in `server/drizzle/`. Never edit a generated migration by hand. Migrations are applied at boot by `runMigrations()` — the single-container deploy has no separate migrate step.
+- **`better-sqlite3` is synchronous.** DB code is straight-line — no `await` on queries. Inside `db.transaction(cb)` the callback is sync: use `.get()`/`.all()`/`.run()`, and relational reads (`db.query.<table>.findFirst({ with })`) with `.sync()`.
+- **Never write raw SQL.** Use the Drizzle query builder / relational queries. A raw `sql` template fragment is a last resort and needs a comment justifying it.
+
+### Slice architecture
+
+Every server feature that touches the DB is a self-contained vertical slice under `server/src/slices/<slice>/`:
+
+- `<slice>.schema.ts` — Drizzle tables + `relations`. `drizzle.config.ts` globs `src/slices/**/*.schema.ts` and `db/client.ts` spreads every slice's schema namespace into the one client (so `db.query` is typed across slices) — adding a slice is picked up by both automatically.
+- `<slice>.router.ts` — Fastify routes, registered under a `/api/<slice>` prefix. Validates request params with the shared Zod schemas; issues **no** DB calls itself.
+- `<slice>.service.ts` — business logic. **Owns `db.transaction`** and is the only layer that opens one; composes db functions inside it.
+- `dbFunctions/` — one file per operation (`insertStrategyRow`, `deleteTabletRows`, …), the **only** place a query is issued. Each takes the `DbTransaction` handle as its first parameter.
+- `<slice>.dto.ts` — maps between DB row types (`InferInsertModel`/`InferSelectModel`) and the shared API types; owns the db-model types the db functions import.
+
+**The write path is layered and never skipped:** router (Zod-validate) → service (`db.transaction`) → db functions (queries). **Wrap every DB trip — reads included — in a transaction.**
+
+### Persistence conventions
+
+- **Text UUID primary keys** (`crypto.randomUUID()`), generated server-side on create — never client-supplied — for future multi-device merge-ability. (Some seeded legacy rows keep hand-written slug ids.)
+- Timestamps are **ms-epoch integers** (`createdAt`/`updatedAt`), matching the repo's `fetchedAt` convention.
+- Child tables reference their parent with `onDelete: 'cascade'`; use a composite PK where it encodes intent (the `(strategyId, tag)` PK makes tags a set).
+- The economy snapshot is a **restart cache, not history**: one upserted row per league. Trend-over-time is poe.ninja's job — do not add snapshot history.
+
+## Testing
+
+- Don't test DB writes (trust Drizzle) or pure DTO/shape transforms (TypeScript already proves the input→output shape).
+- Do test non-trivial computation — the arbitrage/graph math in `packages/shared/test` is the model. Run with `npm test`.
 
 ## Error handling
 

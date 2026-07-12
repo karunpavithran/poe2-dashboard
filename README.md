@@ -89,22 +89,35 @@ migration after a schema change.
 
 ## Data source
 
-Two verified endpoints (June 2026), base
+Two endpoints (verified June 2026), base
 `https://poe.ninja/poe2/api/economy/exchange/current`:
 
 ```text
-GET /overview?league=<league>&type=Currency
-GET /details?league=<league>&type=Currency&id=<detailsId>
+GET /overview?league=<league>&type=<category>
+GET /details?league=<league>&type=<category>&id=<detailsId>
 ```
 
-The overview lists all currencies (with each one's busiest-market rate via
-`maxVolumeCurrency`/`maxVolumeRate`); the details page lists a currency's
-observed outbound rates against the core hubs (divine/exalted/chaos) plus
-daily history. Crucially, **the two directions of a pair are independently
-observed** — e.g. divine→exalted 128.4 while exalted→divine 0.007745, a real
-−0.56% round-trip spread — so the graph is built from observed rates only and
-never inverts a rate (inversion would fabricate a spread-free market). Each
-poll = 1 overview + ~49 details requests at concurrency 4.
+`type` selects one of 14 tradeable categories (`Currency`, `Fragments`,
+`Runes`, `Essences`, `Breach`, …). Every category prices against the same
+divine/exalted/chaos hub, so a poll fetches them all and merges their edges
+into one rate graph — which is what lets arbitrage cycles route across
+categories. `Currency` is the required anchor (it resolves the hub names, and
+its failure fails the whole poll); any other category that errors is logged and
+skipped so one dead category can't sink the snapshot.
+
+Per category, the overview lists its currencies (each with its busiest-market
+rate via `maxVolumeCurrency`/`maxVolumeRate`) and each details page lists a
+currency's observed outbound rates against the core hubs plus daily history.
+Crucially, **the two directions of a pair are independently observed** — e.g.
+divine→exalted 128.4 while exalted→divine 0.007745, a real −0.56% round-trip
+spread — so the graph is built from observed rates only and never inverts a
+rate (inversion would fabricate a spread-free market).
+
+A full poll is one overview + every item's details for each of the 14
+categories — hundreds of requests. Details run 4-at-a-time within a category,
+all behind a shared 3-request/second limiter with exponential 429 backoff
+(`fetch-extras`), so a cold poll takes minutes — which is why the restart cache
+and the on-demand refresh (rather than tight auto-polling) exist.
 
 Volumes are denominated in primary-currency (divine) units, so the min-volume
 filter is "at least this much divine-equivalent daily volume on the cycle's
