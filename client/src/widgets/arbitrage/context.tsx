@@ -1,13 +1,8 @@
-import type { ArbitrageFilters, ExchangeType } from '@poe2-dashboard/shared'
-import {
-  ArbitrageFilterSchema,
-  arbitrageFiltersToParams,
-  EXCHANGE_TYPES,
-} from '@poe2-dashboard/shared'
+import type { ExchangeType } from '@poe2-dashboard/shared'
+import { DEFAULT_MIN_PROFIT, DEFAULT_MIN_VOLUME, EXCHANGE_TYPES } from '@poe2-dashboard/shared'
 import type { SortingState } from '@tanstack/react-table'
 import type { ReactNode } from 'react'
 import { createContext, useCallback, useContext, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router'
 
 import { useArbitragesQuery } from '@/api.js'
 
@@ -36,44 +31,29 @@ type ArbitrageContextValue = {
 const ArbitrageContext = createContext<ArbitrageContextValue | null>(null)
 
 export const ArbitrageProvider = ({ children }: { children: ReactNode }) => {
-  // The three filters live in the URL query string so a filtered view is
-  // shareable/bookmarkable and browser back/forward move through it —
-  // useSearchParams is the single source of truth. The setters rewrite the query
-  // with `replace` so tweaking a threshold doesn't pile up history entries.
-  const [searchParams, setSearchParams] = useSearchParams()
-  const filters = useMemo(
-    () => ArbitrageFilterSchema.parse(Object.fromEntries(searchParams)),
-    [searchParams],
+  // Filters are plain provider state, not URL query params: they never change
+  // the underlying query (the full dataset is filtered client-side below), and
+  // this provider mounts above the router Outlet, so they survive switching
+  // sub-tabs or navigating away from the widget entirely.
+  const [minProfit, setMinProfit] = useState(DEFAULT_MIN_PROFIT)
+  const [minVolume, setMinVolume] = useState(DEFAULT_MIN_VOLUME)
+  const [selectedCategories, setSelectedCategories] = useState<Set<ExchangeType>>(
+    () => new Set(EXCHANGE_TYPES),
   )
-  const { minProfit, minVolume } = filters
-  const selectedCategories = useMemo(() => new Set(filters.categories), [filters.categories])
 
-  // Rewrite the query from a mutated copy of the current filters. Defaults are
-  // omitted (arbitrageFiltersToParams), so the default view carries no params.
-  const updateFilters = useCallback(
-    (patch: Partial<ArbitrageFilters>) =>
-      setSearchParams(arbitrageFiltersToParams({ ...filters, ...patch }), { replace: true }),
-    [filters, setSearchParams],
-  )
-  const setMinProfit = useCallback(
-    (value: number) => updateFilters({ minProfit: value }),
-    [updateFilters],
-  )
-  const setMinVolume = useCallback(
-    (value: number) => updateFilters({ minVolume: value }),
-    [updateFilters],
-  )
-  const toggleCategory = useCallback(
-    (category: ExchangeType) => {
-      const next = new Set(selectedCategories)
+  const toggleCategory = useCallback((category: ExchangeType) => {
+    setSelectedCategories(prev => {
+      const next = new Set(prev)
       if (next.has(category)) next.delete(category)
       else next.add(category)
-      updateFilters({ categories: [...next] })
-    },
-    [selectedCategories, updateFilters],
-  )
-  // Clearing every param restores all defaults (all categories, default thresholds).
-  const resetFilters = useCallback(() => setSearchParams({}, { replace: true }), [setSearchParams])
+      return next
+    })
+  }, [])
+  const resetFilters = useCallback(() => {
+    setMinProfit(DEFAULT_MIN_PROFIT)
+    setMinVolume(DEFAULT_MIN_VOLUME)
+    setSelectedCategories(new Set(EXCHANGE_TYPES))
+  }, [])
 
   const [selectedCycleKey, setSelectedCycleKey] = useState<string | null>(null)
   // Default to highest profit/day (throughput) first.

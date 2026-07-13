@@ -3,13 +3,6 @@ import type { FallbackProps } from 'react-error-boundary'
 import { ErrorBoundary } from 'react-error-boundary'
 import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router'
 
-// Redirect that carries the query string along, so old /arbitrage?minProfit=…
-// deep links keep their filters when they land on /exchanges/arbitrage.
-const RedirectPreservingQuery = ({ to }: { to: string }) => {
-  const { search } = useLocation()
-  return <Navigate to={{ pathname: to, search }} replace />
-}
-
 import { Sidebar } from './components/Sidebar.js'
 import { Card, CardContent } from './components/ui/card.js'
 import { ArbitrageTab } from './widgets/arbitrage/ArbitrageTab.js'
@@ -38,9 +31,9 @@ const WidgetError = ({ error }: FallbackProps) => (
   </Card>
 )
 
-// ArbitrageProvider lives above the Outlet so the arbitrage UI state it still
-// owns — table sorting and the selected payoff cycle — survives navigating away
-// from the widget and back. (The filters themselves now live in the URL query.)
+// ArbitrageProvider lives above the Outlet so the arbitrage UI state it owns —
+// filters, table sorting, and the selected payoff cycle — survives navigating
+// away from the widget and back.
 const Layout = () => {
   const location = useLocation()
 
@@ -73,11 +66,11 @@ export const App = () => (
         <Route path="explorer" element={<ExplorerTab />} />
         {/* Back-compat: the cycle table used to live at /exchanges/cycles and,
             before that, /exchanges/arbitrage — both are now the default tab. */}
-        <Route path="cycles" element={<RedirectPreservingQuery to="/exchanges" />} />
-        <Route path="arbitrage" element={<RedirectPreservingQuery to="/exchanges" />} />
+        <Route path="cycles" element={<Navigate to="/exchanges" replace />} />
+        <Route path="arbitrage" element={<Navigate to="/exchanges" replace />} />
       </Route>
       {/* Back-compat: the widget used to live at /arbitrage. */}
-      <Route path="arbitrage" element={<RedirectPreservingQuery to="/exchanges" />} />
+      <Route path="arbitrage" element={<Navigate to="/exchanges" replace />} />
       <Route path="trends" element={<TrendsWidget />} />
       <Route path="rolls" element={<RollsWidget />} />
       <Route path="atlas" element={<AtlasWidget />} />

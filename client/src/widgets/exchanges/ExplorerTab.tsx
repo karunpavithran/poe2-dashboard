@@ -1,46 +1,21 @@
-import { useSearchParams } from 'react-router'
+import { useOutletContext } from 'react-router'
 
 import { CurrencyDetail } from './CurrencyDetail.js'
 import { CurrencySelector } from './CurrencySelector.js'
-
-type Mode = 'buy' | 'sell'
+import type { ExplorerSelection } from './ExchangesWidget.js'
 
 /**
  * The "Explorer" submodule of the Exchanges widget: a currency-centric
  * master–detail view. The left column ({@link CurrencySelector}) picks a currency;
  * the right pane ({@link CurrencyDetail}) shows its buy/sell rates across the anchor
- * hubs *and* every arbitrage cycle it's part of. The selection lives in the URL
- * (`?c=…&mode=…`) so a comparison is shareable. The Card shell, freshness badge,
- * and poll-error banner live one level up in ExchangesWidget (shared with the
- * Browse tab), so this renders only the body inside that shell's CardContent.
+ * hubs *and* every arbitrage cycle it's part of. The selection is owned by
+ * ExchangesWidget (via the router outlet context) so it survives switching tabs —
+ * this component unmounts on every tab switch. The Card shell, freshness badge,
+ * and poll-error banner also live one level up (shared with the Cycles tab), so
+ * this renders only the body inside that shell's CardContent.
  */
 export const ExplorerTab = () => {
-  const [params, setParams] = useSearchParams()
-  const selected = params.get('c') ?? ''
-  const mode: Mode = params.get('mode') === 'sell' ? 'sell' : 'buy'
-
-  const setSelected = (currency: string) =>
-    setParams(
-      prev => {
-        const next = new URLSearchParams(prev)
-        if (currency) next.set('c', currency)
-        else next.delete('c')
-        return next
-      },
-      { replace: true },
-    )
-
-  const setMode = (next: Mode) =>
-    setParams(
-      prev => {
-        const params = new URLSearchParams(prev)
-        // Buy is the default, so omit it to keep shared links clean.
-        if (next === 'sell') params.set('mode', 'sell')
-        else params.delete('mode')
-        return params
-      },
-      { replace: true },
-    )
+  const { selected, mode, setSelected, setMode } = useOutletContext<ExplorerSelection>()
 
   return (
     <div className="flex min-h-0 flex-1 gap-4">

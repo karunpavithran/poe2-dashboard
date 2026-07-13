@@ -1,10 +1,20 @@
 import { Loader2 } from 'lucide-react'
+import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router'
 
 import { useArbitragesQuery, useRefreshArbitrages } from '@/api.js'
 import { DataAge } from '@/components/common/DataAge.js'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+
+/** Explorer's master–detail selection, held here so it survives tab switches. */
+export type ExplorerSelection = {
+  /** Currency id under inspection, or '' when nothing is picked yet. */
+  selected: string
+  mode: 'buy' | 'sell'
+  setSelected: (currency: string) => void
+  setMode: (mode: 'buy' | 'sell') => void
+}
 
 // Segmented sub-tab link. Active state comes from the router, so the tab lives in
 // the URL (shareable, and the Sidebar remembers which one you were on).
@@ -28,6 +38,14 @@ export const ExchangesWidget = () => {
   const { arbitrages, isArbitragesFetching } = useArbitragesQuery()
   const { dataAgeMs, lastError, isRefreshing } = arbitrages
   const refresh = useRefreshArbitrages()
+
+  // Explorer's selection lives here (above the routed tabs) rather than in the
+  // tab itself, which unmounts on every tab switch. Plain state, not URL query
+  // params: it never alters the underlying query, and this way it persists as
+  // you flip between Cycles and Explorer.
+  const [selected, setSelected] = useState('')
+  const [mode, setMode] = useState<'buy' | 'sell'>('buy')
+  const explorer: ExplorerSelection = { selected, mode, setSelected, setMode }
 
   return (
     <Card className="h-full">
@@ -66,7 +84,7 @@ export const ExchangesWidget = () => {
             Last poll failed: {lastError}
           </p>
         )}
-        <Outlet />
+        <Outlet context={explorer} />
       </CardContent>
     </Card>
   )

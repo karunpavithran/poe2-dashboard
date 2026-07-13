@@ -160,63 +160,14 @@ const EconomyPayloadSchema = z.object({
   hubs: HubNamesSchema,
 })
 
-// --- Arbitrage filter state (client URL query params) ---
+// --- Arbitrage filter state ---
 
 /**
- * Filter defaults — the baseline the toolbar compares against to show "active",
- * and what the URL parser falls back to. Omitting a param from the URL restores
- * its default, so the default view carries no query string at all.
+ * Filter defaults — the initial values of the client's filter state, and the
+ * baseline the toolbar compares against to show "active".
  */
 export const DEFAULT_MIN_PROFIT = 250
 export const DEFAULT_MIN_VOLUME = 10
-
-/**
- * The Arbitrage widget's filter state as it lives in the URL query string, so a
- * filtered view is shareable and bookmarkable. Input is the raw string params
- * (Object.fromEntries(URLSearchParams)); output is the normalized state the UI
- * consumes. Everything is lenient so a malformed or stale link degrades to a
- * sensible view instead of throwing:
- *   - minProfit / minVolume: coerced from string; a missing, non-numeric, or
- *     negative value falls back to its default.
- *   - categories: comma-separated ExchangeType list, deduped, with unknown
- *     tokens dropped. An *absent* param means "all categories" (no filter); a *present*
- *     one is taken literally, so an empty string round-trips the "none selected"
- *     state (an empty table) rather than snapping back to all.
- */
-export const ArbitrageFilterSchema = z.object({
-  minProfit: z.coerce.number().min(0).catch(DEFAULT_MIN_PROFIT),
-  minVolume: z.coerce.number().min(0).catch(DEFAULT_MIN_VOLUME),
-  categories: z
-    .string()
-    .optional()
-    .transform(value => {
-      if (value === undefined) return [...EXCHANGE_TYPES]
-      const selected = value
-        .split(',')
-        .map(part => ExchangeTypeSchema.safeParse(part.trim()))
-        .flatMap(result => (result.success ? [result.data] : []))
-      return [...new Set(selected)]
-    }),
-})
-
-/** Normalized arbitrage filter state parsed from the URL query. */
-export type ArbitrageFilters = z.infer<typeof ArbitrageFilterSchema>
-
-/**
- * Serialize filter state back into URL query params — the inverse of parsing
- * with ArbitrageFilterSchema. Anything at its default is omitted so shared links
- * stay short; the empty-categories case still emits `categories=` to distinguish
- * "none selected" from the omitted "all".
- */
-export const arbitrageFiltersToParams = (filters: ArbitrageFilters): Record<string, string> => {
-  const params: Record<string, string> = {}
-  if (filters.minProfit !== DEFAULT_MIN_PROFIT) params.minProfit = String(filters.minProfit)
-  if (filters.minVolume !== DEFAULT_MIN_VOLUME) params.minVolume = String(filters.minVolume)
-  if (filters.categories.length !== EXCHANGE_TYPES.length) {
-    params.categories = filters.categories.join(',')
-  }
-  return params
-}
 
 export const EconomyResponseSchema = EconomyPayloadSchema.extend({
   /** ms epoch of the snapshot these edges were computed from. */
